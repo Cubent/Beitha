@@ -33,7 +33,27 @@ export class ErrorHandler {
    * Check if an error is a rate limit error
    */
   isRateLimitError(error: any): boolean {
-    return error?.error?.type === 'rate_limit_error';
+    // Check for Anthropic rate limit errors
+    if (error?.error?.type === 'rate_limit_error') {
+      return true;
+    }
+    
+    // Check for Gemini rate limit errors (429 status code)
+    if (error?.status === 429 || error?.code === 429) {
+      return true;
+    }
+    
+    // Check for OpenAI rate limit errors
+    if (error?.error?.code === 'rate_limit_exceeded') {
+      return true;
+    }
+    
+    // Check for generic HTTP 429 errors
+    if (error?.message?.includes('429') || error?.message?.includes('rate limit')) {
+      return true;
+    }
+    
+    return false;
   }
   
   /**
@@ -55,7 +75,13 @@ export class ErrorHandler {
    */
   formatErrorMessage(error: any): string {
     if (this.isRateLimitError(error)) {
-      return `Rate limit error: ${error.error.message}`;
+      if (error?.error?.message) {
+        return `Rate limit error: ${error.error.message}`;
+      } else if (error?.message?.includes('429')) {
+        return `Rate limit error: Too many requests. Retrying...`;
+      } else {
+        return `Rate limit error: Please wait before trying again.`;
+      }
     }
     
     if (this.isOverloadedError(error)) {

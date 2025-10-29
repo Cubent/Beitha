@@ -89,12 +89,14 @@ export const TabStatusBar: React.FC<TabStatusBarProps> = ({
     
     // Reload the page to reinitialize tab connection
     setTimeout(() => {
-      window.location.reload();
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     }, 500);
   };
   
   return (
-    <div className="text-sm bg-base-300 rounded-md px-2 py-1 border border-base-content border-opacity-10 flex items-center justify-between max-w-[200px]">
+    <div className="text-sm bg-base-300 rounded-md px-2 py-1 flex items-center justify-between max-w-[200px]">
       <div className="flex items-center flex-grow overflow-hidden">
         <div className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
           tabStatus === 'attached' ? 'bg-green-500 animate-pulse' : 
@@ -120,7 +122,7 @@ export const TabStatusBar: React.FC<TabStatusBarProps> = ({
       
       <div className="flex items-center ml-2">
           <button 
-            className="px-1.5 py-0.5 bg-base-200 hover:bg-primary hover:text-primary-content rounded text-xs border border-base-content border-opacity-20"
+            className="px-1.5 py-0.5 bg-base-200 hover:bg-primary hover:text-primary-content rounded text-xs"
             onClick={handleRefresh}
             disabled={isRefreshing}
             title="Attach to current tab"

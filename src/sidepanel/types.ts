@@ -1,5 +1,5 @@
 // Define message types
-export type MessageType = 'system' | 'llm' | 'screenshot';
+export type MessageType = 'system' | 'llm' | 'screenshot' | 'user' | 'pageContext';
 
 export interface Message {
   type: MessageType;
@@ -9,6 +9,10 @@ export interface Message {
   isStreaming?: boolean;
   imageData?: string;
   mediaType?: string;
+  url?: string;
+  title?: string;
+  attachedFiles?: File[];
+  images?: string[]; // Data URLs for images
 }
 
 // Chrome message types

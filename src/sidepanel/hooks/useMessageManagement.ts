@@ -32,6 +32,10 @@ export const useMessageManagement = () => {
     }));
   };
 
+  const startStreaming = () => {
+    setIsStreaming(true);
+  };
+
   const finalizeStreamingSegment = (id: number, content: string) => {
     // Add the finalized segment as a complete message
     addMessage({ 
@@ -72,6 +76,7 @@ export const useMessageManagement = () => {
     addMessage,
     addSystemMessage,
     updateStreamingChunk,
+    startStreaming,
     finalizeStreamingSegment,
     startNewSegment,
     completeStreaming,

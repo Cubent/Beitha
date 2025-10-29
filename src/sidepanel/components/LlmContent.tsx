@@ -8,11 +8,15 @@ interface LlmContentProps {
 
 export const LlmContent: React.FC<LlmContentProps> = ({ content }) => {
   // Split content into regular text and tool calls
-  const parts: Array<{ type: 'text' | 'tool', content: string }> = [];
+  const parts: Array<{ type: 'text' | 'tool', content: string, toolName?: string, toolArgs?: string }> = [];
   
   // Process the content to identify tool calls
   // Create a combined regex that handles both direct tool calls and those wrapped in code blocks (xml or bash)
   const combinedToolCallRegex = /(```(?:xml|bash)\s*)?<tool>(.*?)<\/tool>\s*<input>([\s\S]*?)<\/input>(?:\s*<requires_approval>(.*?)<\/requires_approval>)?(\s*```)?/g;
+  
+  // Handle all emoji tool formats: 🕹️ tool: toolName | args: toolArgs OR 🕹️ toolName
+  const emojiToolCallRegex = /🕹️ (?:tool: )?([^|\s]+)(?:\s*\|\s*args:\s*(.+))?/g;
+  
   let lastIndex = 0;
   
   // Create a copy of the content to work with
@@ -20,6 +24,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({ content }) => {
   
   // Reset regex lastIndex
   combinedToolCallRegex.lastIndex = 0;
+  emojiToolCallRegex.lastIndex = 0;
   
   // Process all tool calls (both direct and code block) in a single pass
   let match;
@@ -36,6 +41,28 @@ export const LlmContent: React.FC<LlmContentProps> = ({ content }) => {
     parts.push({
       type: 'tool',
       content: match[0]
+    });
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Process emoji tool calls (both with and without args)
+  emojiToolCallRegex.lastIndex = 0;
+  while ((match = emojiToolCallRegex.exec(contentCopy)) !== null) {
+    // Add text before the tool call
+    if (match.index > lastIndex) {
+      parts.push({
+        type: 'text',
+        content: contentCopy.substring(lastIndex, match.index)
+      });
+    }
+    
+    // Add the emoji tool call with parsed tool name and args (args might be undefined)
+    parts.push({
+      type: 'tool',
+      content: match[0],
+      toolName: match[1].trim(),
+      toolArgs: match[2] ? match[2].trim() : ''
     });
     
     lastIndex = match.index + match[0].length;
@@ -61,6 +88,17 @@ export const LlmContent: React.FC<LlmContentProps> = ({ content }) => {
     <>
       {parts.map((part, index) => {
         if (part.type === 'text') {
+          // Filter out unwanted tab information
+          const filteredContent = part.content
+            .replace(/Tab \d+/g, '')
+            .replace(/URL\s*$/gm, '')
+            .replace(/\n\s*\n/g, '\n')
+            .trim();
+          
+          if (!filteredContent) {
+            return null;
+          }
+          
           // Render regular text with markdown
           return (
             <ReactMarkdown 
@@ -89,14 +127,62 @@ export const LlmContent: React.FC<LlmContentProps> = ({ content }) => {
                 td: ({node, ...props}) => <td className="border border-base-300 px-4 py-2" {...props} />,
               }}
             >
-              {part.content}
+              {filteredContent}
             </ReactMarkdown>
           );
         } else {
           // Render tool calls with special styling
-          // We don't need to check for specific formats anymore since we're using a combined regex
-          // Just return null for all tool calls to prevent empty bubbles
-          return null;
+          if (part.toolName) {
+            // Render emoji tool calls with clean design
+            const getToolDisplayName = (toolName: string) => {
+              switch (toolName) {
+                case 'lookup_memories':
+                  return 'Looking Memories';
+                case 'browser_read_text':
+                  return 'Reading Text';
+                case 'browser_click':
+                  return 'Clicking';
+                case 'browser_type':
+                  return 'Typing';
+                case 'browser_navigate':
+                  return 'Navigating';
+                case 'browser_screenshot':
+                  return 'Taking Screenshot';
+                case 'browser_press_key':
+                  return 'Pressing Key';
+                case 'browser_scroll':
+                  return 'Scrolling';
+                case 'browser_wait':
+                  return 'Waiting';
+                case 'browser_hover':
+                  return 'Hovering';
+                case 'browser_snapshot_dom':
+                  return 'Taking DOM Snapshot';
+                case 'browser_query':
+                  return 'Querying Elements';
+                case 'browser_wait_for':
+                  return 'Waiting For Element';
+                case 'browser_get_attribute':
+                  return 'Getting Attribute';
+                case 'browser_scroll_to':
+                  return 'Scrolling To Element';
+                default:
+                  return toolName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              }
+            };
+
+            return (
+              <div key={index} className="text-left text-sm text-gray-600 mb-0.5 py-0.5">
+                <span className="font-medium">{getToolDisplayName(part.toolName)}</span>
+                {part.toolArgs && part.toolArgs.trim() && (
+                  <span className="text-gray-500 ml-2">{part.toolArgs}</span>
+                )}
+              </div>
+            );
+          } else {
+            // For other tool call formats, return null to prevent empty bubbles
+            return null;
+          }
         }
       })}
     </>

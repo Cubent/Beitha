@@ -5,9 +5,11 @@ import { BrowserTool } from "./tools/types";
  */
 export class PromptManager {
   private tools: BrowserTool[];
+  private askMode: boolean;
   
-  constructor(tools: BrowserTool[]) {
+  constructor(tools: BrowserTool[], askMode: boolean = false) {
     this.tools = tools;
+    this.askMode = askMode;
   }
   
   // Store the current page context
@@ -32,6 +34,16 @@ Remember to follow the verification-first workflow: navigate → observe → ana
    * Build the fixed system prompt for the agent.
    */
   getSystemPrompt(): string {
+    if (this.askMode) {
+      // Simplified prompt for ask mode - no tools, no browser automation
+      return `You are a helpful AI assistant called **BrowserBee 🐝**.
+
+You are in ASK mode, which means you should respond as a helpful AI assistant without using any browser automation tools. Just provide helpful, informative responses to the user's questions.
+
+Be concise, accurate, and helpful in your responses.`;
+    }
+
+    // Full browser automation prompt for normal mode
     const toolDescriptions = this.tools
       .map(t => `${t.name}: ${t.description}`)
       .join("\n\n");

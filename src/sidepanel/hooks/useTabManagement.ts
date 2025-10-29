@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 
-export const useTabManagement = () => {
+export const useTabManagement = (mode: 'ask' | 'do' = 'do') => {
   const [tabId, setTabId] = useState<number | null>(null);
   const [windowId, setWindowId] = useState<number | null>(null);
-  const [tabTitle, setTabTitle] = useState<string>('');
+  const [tabTitle, setTabTitle] = useState<string>('Ask Mode - No Tab Required');
 
-  // Get the current tab ID and title when the component mounts
+  // Get the current tab ID and title when the component mounts (only in Do mode)
   useEffect(() => {
+    if (mode !== 'do') return;
+    
     const getCurrentTab = async () => {
       try {
         // Try to get the tab ID from the last focused window
@@ -22,18 +24,20 @@ export const useTabManagement = () => {
           console.log(`Using tab ID ${activeTabId} in window ${windowId} from last focused window`);
           console.log(`Tab title: ${activeTabTitle}`);
 
-          // Initialize tab attachment early, including the window ID
-          chrome.runtime.sendMessage({
-            action: 'initializeTab',
-            tabId: activeTabId,
-            windowId: windowId
-          }, (response) => {
-            if (chrome.runtime.lastError) {
-              console.error('Error initializing tab:', chrome.runtime.lastError);
-            } else if (response && response.success) {
-              console.log(`Tab ${activeTabId} in window ${windowId} initialized successfully`);
-            }
-          });
+          // Initialize tab attachment early, including the window ID (only for Do mode)
+          if (mode === 'do') {
+            chrome.runtime.sendMessage({
+              action: 'initializeTab',
+              tabId: activeTabId,
+              windowId: windowId
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error('Error initializing tab:', chrome.runtime.lastError);
+              } else if (response && response.success) {
+                console.log(`Tab ${activeTabId} in window ${windowId} initialized successfully`);
+              }
+            });
+          }
         }
       } catch (error) {
         console.error('Error getting current tab:', error);
@@ -41,11 +45,11 @@ export const useTabManagement = () => {
     };
 
     getCurrentTab();
-  }, []);
+  }, [mode]);
 
-  // Listen for tab updates to update the tab title in real-time
+  // Listen for tab updates to update the tab title in real-time (only in Do mode)
   useEffect(() => {
-    if (!tabId) return;
+    if (mode !== 'do' || !tabId) return;
 
     const handleTabUpdated = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo, _tab: chrome.tabs.Tab) => {
       // Only update if this is our tab and the title has changed
@@ -62,11 +66,57 @@ export const useTabManagement = () => {
     return () => {
       chrome.tabs.onUpdated.removeListener(handleTabUpdated);
     };
-  }, [tabId]);
+  }, [mode, tabId]);
 
-  // Listen for tab replacement and active tab change events
+  // Listen for tab activation changes (when user switches tabs) - only in Do mode
   useEffect(() => {
-    if (!tabId) return;
+    if (mode !== 'do') return;
+    
+    const handleTabActivated = async (activeInfo: chrome.tabs.TabActiveInfo) => {
+      try {
+        // Check if the agent is currently running before allowing tab switch
+        const response = await chrome.runtime.sendMessage({
+          action: 'checkAgentStatus',
+          tabId: tabId
+        });
+        
+        // If agent is running, don't allow tab switch
+        if (response && response.status === 'running') {
+          console.log(`Agent is running, preventing tab switch to ${activeInfo.tabId}`);
+          return;
+        }
+        
+        const tab = await chrome.tabs.get(activeInfo.tabId);
+        if (tab && tab.id) {
+          console.log(`User switched to tab ${tab.id}: ${tab.title}`);
+          setTabId(tab.id);
+          setWindowId(tab.windowId);
+          setTabTitle(tab.title || 'Unknown Tab');
+          
+          // Initialize the new tab (only for Do mode)
+          if (mode === 'do') {
+            chrome.runtime.sendMessage({
+              action: 'initializeTab',
+              tabId: tab.id,
+              windowId: tab.windowId
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error handling tab activation:', error);
+      }
+    };
+
+    chrome.tabs.onActivated.addListener(handleTabActivated);
+    
+    return () => {
+      chrome.tabs.onActivated.removeListener(handleTabActivated);
+    };
+  }, [mode, tabId]);
+
+  // Listen for tab replacement and active tab change events (only in Do mode)
+  useEffect(() => {
+    if (mode !== 'do' || !tabId) return;
 
     const messageListener = (
       message: any,
@@ -116,7 +166,7 @@ export const useTabManagement = () => {
     return () => {
       chrome.runtime.onMessage.removeListener(messageListener);
     };
-  }, [tabId]);
+  }, [mode, tabId]);
 
   return {
     tabId,

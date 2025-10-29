@@ -56,53 +56,70 @@ export function TokenUsageDisplay() {
     };
   }, []);
 
-  // const totalTokens = usage.inputTokens + usage.outputTokens;
+  const totalTokens = usage.inputTokens + usage.outputTokens;
 
   // Format provider name for display
-  // const formatProviderName = (provider: string) => {
-  //   switch (provider) {
-  //     case 'anthropic': return 'Anthropic';
-  //     case 'openai': return 'OpenAI';
-  //     case 'gemini': return 'Google';
-  //     case 'ollama': return 'Ollama';
-  //     default: return provider;
-  //   }
-  // };
+  const formatProviderName = (provider: string) => {
+    switch (provider) {
+      case 'anthropic': return 'Anthropic';
+      case 'openai': return 'OpenAI';
+      case 'gemini': return 'Google';
+      case 'ollama': return 'Ollama';
+      default: return provider;
+    }
+  };
 
-  // // Format model name for display
-  // const formatModelName = (modelId: string) => {
-  //   // Extract the model name from the model ID
-  //   if (modelId.includes('claude')) {
-  //     // For Claude models, extract the version and variant
-  //     const match = modelId.match(/claude-(\d+\.\d+)-(\w+)/);
-  //     if (match) {
-  //       return `Claude ${match[1]} ${match[2].charAt(0).toUpperCase() + match[2].slice(1)}`;
-  //     }
-  //     return modelId;
-  //   } else if (modelId.includes('gpt')) {
-  //     // For GPT models, capitalize and format
-  //     return modelId.toUpperCase().replace(/-/g, ' ');
-  //   } else if (modelId.includes('gemini')) {
-  //     // For Gemini models, capitalize and format
-  //     const parts = modelId.split('-');
-  //     return `Gemini ${parts[1]} ${parts[2].charAt(0).toUpperCase() + parts[2].slice(1)}`;
-  //   } else if (modelId.includes('llama')) {
-  //     // For Llama models, capitalize and format
-  //     return `Llama ${modelId.replace('llama', '')}`;
-  //   } else if (modelId.includes('Qwen')) {
-  //     // For Qwen models, format nicely
-  //     return modelId.replace('-Instruct', '');
-  //   }
-  //   return modelId;
-  // };
+  // Format model name for display
+  const formatModelName = (modelId: string) => {
+    // Extract the model name from the model ID
+    if (modelId.includes('claude')) {
+      // For Claude models, extract the version and variant
+      const match = modelId.match(/claude-(\d+\.\d+)-(\w+)/);
+      if (match) {
+        return `Claude ${match[1]} ${match[2].charAt(0).toUpperCase() + match[2].slice(1)}`;
+      }
+      return modelId;
+    } else if (modelId.includes('gpt')) {
+      // For GPT models, capitalize and format
+      return modelId.toUpperCase().replace(/-/g, ' ');
+    } else if (modelId.includes('gemini')) {
+      // For Gemini models, capitalize and format
+      const parts = modelId.split('-');
+      return `Gemini ${parts[1]} ${parts[2].charAt(0).toUpperCase() + parts[2].slice(1)}`;
+    } else if (modelId.includes('llama')) {
+      // For Llama models, capitalize and format
+      return `Llama ${modelId.replace('llama', '')}`;
+    } else if (modelId.includes('Qwen')) {
+      // For Qwen models, format nicely
+      return modelId.replace('-Instruct', '');
+    }
+    return modelId;
+  };
 
   return (
     <div className="card bg-base-100 shadow-sm p-3 mt-2 text-xs">
+      {/* Provider and Model Info */}
+      {providerConfig && (
+        <div className="flex justify-between items-center mb-2">
+          <span className="font-medium">Provider:</span>
+          <span>{formatProviderName(providerConfig.provider)} {providerConfig.apiModelId && `(${formatModelName(providerConfig.apiModelId)})`}</span>
+        </div>
+      )}
+      
+      {/* Token Usage */}
       <div className="flex justify-between items-center">
         <span className="font-medium">Token Usage:</span>
         <span><FontAwesomeIcon icon={faArrowUp} /> {formatTokenCount(usage.inputTokens)} <FontAwesomeIcon icon={faArrowDown} /> {formatTokenCount(usage.outputTokens)}</span>
       </div>
-      <div className="flex justify-between mt-1">
+      
+      {/* Total Tokens */}
+      <div className="flex justify-between items-center mt-1">
+        <span className="font-medium">Total Tokens:</span>
+        <span>{formatTokenCount(totalTokens)}</span>
+      </div>
+      
+      {/* Estimated Cost */}
+      <div className="flex justify-between items-center mt-1">
         <span className="font-medium">Estimated Cost:</span>
         <span>${usage.cost.toFixed(6)}</span>
       </div>

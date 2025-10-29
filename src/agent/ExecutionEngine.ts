@@ -218,10 +218,13 @@ export class ExecutionEngine {
   private async processLlmStream(
     messages: any[],
     adaptedCallbacks: ExecutionCallbacks
-  ): Promise<{ accumulatedText: string, toolCallDetected: boolean }> {
+  ): Promise<{ accumulatedText: string, toolCallDetected: boolean, toolName?: string, toolInput?: string, requiresApproval?: boolean }> {
     let accumulatedText = "";
     let streamBuffer = "";
     let toolCallDetected = false;
+    let toolName = "";
+    let toolInput = "";
+    let requiresApproval = false;
 
     // Get tools from the ToolManager
     const tools = this.toolManager.getTools();
@@ -266,7 +269,11 @@ export class ExecutionEngine {
           console.log("Complete tool call detected:", completeToolCallMatch);
 
           // Extract the tool call with requires_approval value
-          const [fullMatch, codeBlockStart, toolName, toolInput, requiresApprovalRaw] = completeToolCallMatch;
+          const [fullMatch, codeBlockStart, extractedToolName, extractedToolInput, requiresApprovalRaw] = completeToolCallMatch;
+          
+          toolName = extractedToolName.trim();
+          toolInput = extractedToolInput.trim();
+          requiresApproval = requiresApprovalRaw.trim().toLowerCase() === 'true';
 
           // Find the start of the tool call
           const matchIndex = codeBlockStart
@@ -311,7 +318,7 @@ export class ExecutionEngine {
 
     adaptedCallbacks.onLlmOutput(accumulatedText);
 
-    return { accumulatedText, toolCallDetected };
+    return { accumulatedText, toolCallDetected, toolName, toolInput, requiresApproval };
   }
 
   /**
@@ -342,10 +349,92 @@ export class ExecutionEngine {
           if (this.errorHandler.isExecutionCancelled()) break;
 
           // ── 1. Call LLM with streaming ───────────────────────────────────────
-          const { accumulatedText } = await this.processLlmStream(messages, adaptedCallbacks);
+          const { accumulatedText, toolCallDetected, toolName: streamToolName, toolInput: streamToolInput, requiresApproval: streamRequiresApproval } = await this.processLlmStream(messages, adaptedCallbacks);
 
           // Check for cancellation after LLM response
           if (this.errorHandler.isExecutionCancelled()) break;
+
+          // If a tool call was detected in streaming mode, execute it immediately
+          if (toolCallDetected && streamToolName && streamToolInput !== undefined) {
+            const tool = this.toolManager.findTool(streamToolName);
+            
+            if (!tool) {
+              messages.push(
+                { role: "assistant", content: accumulatedText },
+                {
+                  role: "user",
+                  content: `Error: tool "${streamToolName}" not found. Available: ${this.toolManager.getTools()
+                    .map((t) => t.name)
+                    .join(", ")}`,
+                }
+              );
+              continue;
+            }
+
+            // Check for cancellation before tool execution
+            if (this.errorHandler.isExecutionCancelled()) break;
+
+            // ── Execute tool detected in streaming ──────────────────────────────
+            adaptedCallbacks.onToolOutput(`🕹️ tool: ${streamToolName} | args: ${streamToolInput}`);
+
+            let result: string;
+
+            if (streamRequiresApproval) {
+              // Notify the user that approval is required
+              adaptedCallbacks.onToolOutput(`⚠️ This action requires approval: The AI assistant has determined this action requires your approval.`);
+
+              // Get the current tab ID from chrome.tabs API
+              const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+              const tabId = tabs[0]?.id || 0;
+
+              try {
+                // Request approval from the user
+                const approved = await requestApproval(tabId, streamToolName, streamToolInput, "The AI assistant has determined this action requires your approval.");
+
+                if (approved) {
+                  // User approved, execute the tool
+                  adaptedCallbacks.onToolOutput(`✅ Action approved by user. Executing...`);
+
+                  // Create a context object to pass to the tool
+                  const context = {
+                    requiresApproval: true,
+                    approvalReason: "The AI assistant has determined this action requires your approval."
+                  };
+
+                  // Execute the tool with the context
+                  result = await tool.func(streamToolInput, context);
+                } else {
+                  // User rejected, skip execution
+                  result = "Action cancelled by user.";
+                  adaptedCallbacks.onToolOutput(`❌ Action rejected by user.`);
+                }
+              } catch (approvalError) {
+                console.error(`Error in approval process:`, approvalError);
+                result = "Error in approval process. Action cancelled.";
+                adaptedCallbacks.onToolOutput(`❌ Error in approval process: ${approvalError}`);
+              }
+            } else {
+              // No approval required, execute the tool normally
+              result = await tool.func(streamToolInput);
+            }
+
+            // Signal that tool execution is complete
+            if (adaptedCallbacks.onToolEnd) {
+              adaptedCallbacks.onToolEnd(result);
+            }
+
+            // Check for cancellation after tool execution
+            if (this.errorHandler.isExecutionCancelled()) break;
+
+            // Record the tool execution in conversation history
+            messages.push(
+              { role: "assistant", content: accumulatedText },
+              { role: "tool", content: result, tool_call_id: streamToolName }
+            );
+
+            // Continue to next iteration to get the next LLM response
+            continue;
+          }
 
           // Check for incomplete or malformed tool calls
           // This regex looks for tool calls that have <tool> and <input> but are missing <requires_approval>
@@ -567,12 +656,54 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
 
             // Handle screenshot references
             if (parsedResult.type === "screenshotRef" && parsedResult.id) {
-              // Create a message for the LLM with the screenshot reference
-              // The actual screenshot display is handled by agentController.ts
-              messages.push({
-                role: "user",
-                content: `Tool result: Screenshot captured (${parsedResult.id}). ${parsedResult.note || ''} Based on this image, please answer the user's original question: "${prompt}". Don't just describe the image - focus on answering the specific question or completing the task the user asked for.`
+              // Import ScreenshotManager to get the actual image data
+              const { ScreenshotManager } = await import("../tracking/screenshotManager");
+              const screenshotManager = ScreenshotManager.getInstance();
+              const screenshotData = screenshotManager.getScreenshot(parsedResult.id);
+              
+              console.log(`[ExecutionEngine] Screenshot reference ${parsedResult.id} found:`, {
+                hasData: !!screenshotData,
+                hasSource: !!(screenshotData && screenshotData.source),
+                hasImageData: !!(screenshotData && screenshotData.source && screenshotData.source.data),
+                dataLength: screenshotData?.source?.data?.length || 0,
+                mediaType: screenshotData?.source?.media_type
               });
+              
+              if (screenshotData && screenshotData.source && screenshotData.source.data) {
+                // Create a message with the actual image data for the LLM
+                const imageMessage = {
+                  role: "user",
+                  content: [
+                    { 
+                      type: "text", 
+                      text: `Tool result: Screenshot captured. ${parsedResult.note || ''} Based on this image, please answer the user's original question: "${prompt}". Don't just describe the image - focus on answering the specific question or completing the task the user asked for.`
+                    },
+                    {
+                      type: "image",
+                      source: {
+                        type: "base64",
+                        media_type: screenshotData.source.media_type || "image/jpeg",
+                        data: screenshotData.source.data
+                      }
+                    }
+                  ]
+                };
+                
+                console.log(`[ExecutionEngine] Adding image message to LLM:`, {
+                  hasImage: true,
+                  imageDataLength: screenshotData.source.data.length,
+                  mediaType: screenshotData.source.media_type
+                });
+                
+                messages.push(imageMessage);
+              } else {
+                // Fallback if screenshot data not found
+                console.log(`[ExecutionEngine] Screenshot data not found for ${parsedResult.id}`);
+                messages.push({
+                  role: "user",
+                  content: `Tool result: Screenshot captured (${parsedResult.id}) but image data not available. ${parsedResult.note || ''}`
+                });
+              }
             } else {
               // For other JSON results, stringify them nicely
               messages.push({

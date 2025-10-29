@@ -1,6 +1,7 @@
 // Import provider-specific types
 import Anthropic from "@anthropic-ai/sdk";
 import { BrowserAgent, createBrowserAgent, executePromptWithFallback, needsReinitialization } from "../agent/AgentCore";
+import { createProvider } from "../models/providers";
 import { ExecutionCallbacks } from "../agent/ExecutionEngine";
 import { contextTokenCount } from "../agent/TokenManager";
 import { ScreenshotManager } from "../tracking/screenshotManager";
@@ -35,7 +36,7 @@ import { sendUIMessage, logWithTimestamp, handleError } from "./utils";
 // Generic message format that works with all providers
 interface GenericMessage {
   role: string;
-  content: string | any;
+  content: any;
 }
 
 // Interface for structured message history
@@ -220,18 +221,28 @@ export async function getMessageHistory(tabId: number): Promise<Anthropic.Messag
  * @returns The provider-specific messages
  */
 function convertMessagesToProviderFormat(messages: GenericMessage[], provider: ProviderType): Anthropic.MessageParam[] {
+  console.log(`[AgentController] Converting ${messages.length} messages for provider ${provider}`);
+  
   switch (provider) {
     case 'anthropic':
       // Convert to Anthropic format
-      return messages.map(msg => {
+      return messages.map((msg, index) => {
         // Ensure role is either "user" or "assistant" for Anthropic
         const role = msg.role === "user" || msg.role === "assistant" 
           ? msg.role as "user" | "assistant"
           : "user"; // Default to user for any other role
         
+        const hasImages = Array.isArray(msg.content) && msg.content.some((item: any) => item.type === 'image');
+        if (hasImages) {
+          console.log(`[AgentController] Message ${index} contains images:`, {
+            contentLength: msg.content.length,
+            imageBlocks: msg.content.filter((item: any) => item.type === 'image').length
+          });
+        }
+        
         return {
           role,
-          content: msg.content
+          content: msg.content as Anthropic.MessageParam['content']
         };
       });
       
@@ -243,19 +254,40 @@ function convertMessagesToProviderFormat(messages: GenericMessage[], provider: P
         
         return {
           role,
-          content: msg.content
+          content: msg.content as Anthropic.MessageParam['content']
         };
       });
       
     case 'gemini':
-      // Convert to Gemini format (which is compatible with Anthropic's format for our purposes)
+      // Convert to Gemini format - handle both simple content and complex content with images
       return messages.map(msg => {
         // Map roles: system -> user, user -> user, assistant -> assistant
         const role = msg.role === "assistant" ? "assistant" : "user";
         
+        // Handle complex content structures (arrays with text and images)
+        if (Array.isArray(msg.content)) {
+          return {
+            role,
+            content: msg.content.map(item => {
+              if (item.type === "image" && item.source) {
+                // Convert Anthropic image format to Gemini format
+                return {
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: item.source.media_type,
+                    data: item.source.data
+                  }
+                };
+              }
+              return item;
+            }) as Anthropic.MessageParam['content']
+          };
+        }
+        
         return {
           role,
-          content: msg.content
+          content: msg.content as Anthropic.MessageParam['content']
         };
       });
       
@@ -267,7 +299,7 @@ function convertMessagesToProviderFormat(messages: GenericMessage[], provider: P
         
         return {
           role,
-          content: msg.content
+          content: msg.content as Anthropic.MessageParam['content']
         };
       });
       
@@ -280,7 +312,7 @@ function convertMessagesToProviderFormat(messages: GenericMessage[], provider: P
         
         return {
           role,
-          content: msg.content
+          content: msg.content as Anthropic.MessageParam['content']
         };
       });
   }
@@ -460,20 +492,121 @@ export function cancelExecution(tabId?: number): void {
  * @param tabId Optional tab ID to execute the prompt for
  * @param isReflectionPrompt Optional flag to indicate if this is a reflection prompt
  */
-export async function executePrompt(prompt: string, tabId?: number, isReflectionPrompt: boolean = false): Promise<void> {
+export async function executePrompt(prompt: string, tabId?: number, isReflectionPrompt: boolean = false, askMode: boolean = false, imageData?: { type: string; source: { type: string; media_type: string; data: string } }[]): Promise<void> {
   try {
+    console.log(`[AgentController] executePrompt called with:`, {
+      promptLength: prompt.length,
+      hasImageData: !!(imageData && imageData.length > 0),
+      imageDataLength: imageData?.length || 0,
+      imageDataSize: imageData?.reduce((total, img) => total + (img.source?.data?.length || 0), 0) || 0,
+      askMode,
+      tabId
+    });
+    
     // Get provider configuration from ConfigManager
     const configManager = ConfigManager.getInstance();
     const providerConfig = await configManager.getProviderConfig();
     
+    console.log(`[AgentController] Provider config loaded:`, {
+      provider: providerConfig.provider,
+      hasApiKey: !!providerConfig.apiKey
+    });
+    
     // Make API key optional for Ollama
     if (!providerConfig.apiKey && providerConfig.provider !== 'ollama') {
+      console.log(`[AgentController] ERROR: No API key for ${providerConfig.provider}`);
       sendUIMessage('updateOutput', {
         type: 'system',
         content: `Error: API key not found for ${providerConfig.provider}. Please set your API key in the extension options.`
       }, tabId);
       sendUIMessage('processingComplete', null, tabId);
       return;
+    }
+    
+    console.log(`[AgentController] API key check passed, continuing...`);
+
+    // For ask mode, we don't need tab initialization
+    if (askMode) {
+      console.log(`[AgentController] Ask mode detected, creating LLM provider...`);
+      // Create a simple LLM provider for ask mode
+      const provider = await createProvider(providerConfig.provider, {
+        apiKey: providerConfig.apiKey,
+        apiModelId: providerConfig.apiModelId,
+        baseUrl: providerConfig.baseUrl,
+        thinkingBudgetTokens: providerConfig.thinkingBudgetTokens,
+        dangerouslyAllowBrowser: true,
+      });
+
+      try {
+        // Simple direct LLM call for ask mode
+        console.log(`[AgentController] Ask mode - creating message with image data:`, {
+          hasImageData: !!(imageData && imageData.length > 0),
+          imageDataLength: imageData?.length || 0
+        });
+        
+        let userMessage: any;
+        if (imageData && imageData.length > 0) {
+          // Create message with images
+          userMessage = {
+            role: 'user',
+            content: [
+              { type: "text", text: prompt },
+              ...imageData.map(img => ({
+                type: "image" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: img.source.media_type as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+                  data: img.source.data
+                }
+              }))
+            ]
+          };
+        } else {
+          // Create text-only message
+          userMessage = {
+            role: 'user',
+            content: prompt
+          };
+        }
+        
+        console.log(`[AgentController] Ask mode user message:`, {
+          hasImages: Array.isArray(userMessage.content) && userMessage.content.some((item: any) => item.type === 'image'),
+          contentLength: Array.isArray(userMessage.content) ? userMessage.content.length : 0
+        });
+        
+        const stream = provider.createMessage(
+          "You are a helpful AI assistant. Respond to the user's question directly and helpfully.",
+          [userMessage]
+        );
+
+        // Consume the stream and collect the response
+        let fullResponse = '';
+        for await (const chunk of stream) {
+          if (chunk.type === 'text' && chunk.text) {
+            fullResponse += chunk.text;
+            // Send only the new chunk content for streaming
+            sendUIMessage('updateStreamingChunk', {
+              content: chunk.text
+            }, tabId);
+          }
+        }
+        
+        // Send the final complete response
+        sendUIMessage('updateOutput', {
+          type: 'llm',
+          content: fullResponse
+        }, tabId);
+        
+        sendUIMessage('processingComplete', null, tabId);
+        return;
+      } catch (error) {
+        sendUIMessage('updateOutput', {
+          type: 'system',
+          content: `Error: ${error instanceof Error ? error.message : String(error)}`
+        }, tabId);
+        sendUIMessage('processingComplete', null, tabId);
+        return;
+      }
     }
 
     // Use the provided tabId if available, otherwise query for the active tab
@@ -592,8 +725,10 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
         const pageContextMessage = `Current page: ${currentUrl} (${currentTitle}) - Consider this context when executing commands. If asked to summarize, create tables, or analyze options without specific references, assume the request refers to content on this page.`;
         
         sendUIMessage('updateOutput', {
-          type: 'system',
-          content: pageContextMessage
+          type: 'pageContext',
+          content: pageContextMessage,
+          url: currentUrl,
+          title: currentTitle
         }, targetTabId);
         
         // Set the current page context in the PromptManager
@@ -615,10 +750,11 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
     }
     
     // Execute the prompt
-    sendUIMessage('updateOutput', {
-      type: 'system',
-      content: `Executing prompt: "${prompt}"`
-    }, targetTabId);
+      // Hide the "Executing prompt" message for cleaner UI
+      // sendUIMessage('updateOutput', {
+      //   type: 'system',
+      //   content: `Executing prompt: "${prompt}"`
+      // }, targetTabId);
     
     // Set agent status to RUNNING if we have a window ID
     if (updatedTabState.windowId) {
@@ -633,28 +769,155 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
     
     // Get the structured message history
     const history = await getStructuredMessageHistory(targetTabId);
+    console.log(`[AgentController] Message history retrieved:`, {
+      hasOriginalRequest: !!history.originalRequest,
+      conversationLength: history.conversationHistory.length
+    });
+    
+    // Get current provider to determine message format
+    const currentProvider = await getCurrentProvider();
+    console.log(`[AgentController] Using provider: ${currentProvider}`);
     
     // Check if this is the first prompt (no original request yet)
+    console.log(`[AgentController] History check:`, {
+      hasOriginalRequest: !!history.originalRequest,
+      conversationLength: history.conversationHistory.length,
+      imageDataPresent: !!(imageData && imageData.length > 0)
+    });
+    
     if (!history.originalRequest) {
+      console.log(`[AgentController] First prompt - no original request yet. Processing image data...`);
       // Store this as the original request without adding any special tag
-      await setOriginalRequest(targetTabId, { 
-        role: "user", 
-        content: prompt 
-      });
+      let userMessage: Anthropic.MessageParam;
+      
+      
+      if (imageData && imageData.length > 0) {
+        console.log(`[AgentController] Processing ${imageData.length} images for provider ${currentProvider}:`, 
+          imageData.map(img => ({
+            type: img.type,
+            sourceType: img.source.type,
+            mediaType: img.source.media_type,
+            dataLength: img.source.data.length,
+            dataPreview: img.source.data.substring(0, 50) + '...'
+          }))
+        );
+        
+        if (currentProvider === 'gemini') {
+          // Gemini format: content as array with text and inlineData
+          userMessage = {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              ...imageData.map(img => ({
+                type: "image" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: img.source.media_type as "image/png" | "image/jpeg" | "image/webp",
+                  data: img.source.data
+                }
+              }))
+            ]
+          };
+        } else {
+          // Anthropic/OpenAI format
+          userMessage = {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              ...imageData.map(img => ({
+                type: "image" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: img.source.media_type as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+                  data: img.source.data
+                }
+              }))
+            ]
+          };
+        }
+        
+        console.log(`[AgentController] Created user message with images:`, {
+          hasImages: true,
+          contentLength: Array.isArray(userMessage.content) ? userMessage.content.length : 0,
+          imageBlocks: Array.isArray(userMessage.content) ? userMessage.content.filter(item => item.type === 'image').length : 0,
+          messageStructure: userMessage
+        });
+      } else {
+        userMessage = { 
+          role: "user", 
+          content: prompt 
+        };
+        console.log(`[AgentController] Created user message without images`);
+      }
+      
+      await setOriginalRequest(targetTabId, userMessage);
       
       // Also add it to the conversation history to maintain the flow
-      await addToConversationHistory(targetTabId, { 
-        role: "user", 
-        content: prompt 
-      });
+      await addToConversationHistory(targetTabId, userMessage);
       
       logWithTimestamp(`Set original request for tab ${targetTabId}: "${prompt}"`);
     } else {
       // This is a follow-up prompt, add it to conversation history
-      await addToConversationHistory(targetTabId, { 
-        role: "user", 
-        content: prompt 
+      console.log(`[AgentController] Follow-up prompt - processing image data in conversation history...`);
+      let userMessage: Anthropic.MessageParam;
+      
+      if (imageData && imageData.length > 0) {
+        console.log(`[AgentController] Processing ${imageData.length} images for follow-up prompt with provider ${currentProvider}:`, 
+          imageData.map(img => ({
+            type: img.type,
+            sourceType: img.source.type,
+            mediaType: img.source.media_type,
+            dataLength: img.source.data.length,
+            dataPreview: img.source.data.substring(0, 50) + '...'
+          }))
+        );
+        if (currentProvider === 'gemini') {
+          // Gemini format: content as array with text and inlineData
+          userMessage = {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              ...imageData.map(img => ({
+                type: "image" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: img.source.media_type as "image/png" | "image/jpeg" | "image/webp",
+                  data: img.source.data
+                }
+              }))
+            ]
+          };
+        } else {
+          // Anthropic/OpenAI format
+          userMessage = {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              ...imageData.map(img => ({
+                type: "image" as const,
+                source: {
+                  type: "base64" as const,
+                  media_type: img.source.media_type as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+                  data: img.source.data
+                }
+              }))
+            ]
+          };
+        }
+      } else {
+        userMessage = { 
+          role: "user", 
+          content: prompt 
+        };
+      }
+      
+      console.log(`[AgentController] Follow-up user message created:`, {
+        hasImages: Array.isArray(userMessage.content) && userMessage.content.some(item => item.type === 'image'),
+        contentLength: Array.isArray(userMessage.content) ? userMessage.content.length : 0,
+        imageBlocks: Array.isArray(userMessage.content) ? userMessage.content.filter(item => item.type === 'image').length : 0
       });
+      
+      await addToConversationHistory(targetTabId, userMessage);
     }
     
     // Create callbacks for the agent
@@ -685,18 +948,13 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
         if (isReflectionPrompt) {
           // Get the domain from the current page
           try {
-            updatedTabState.page.evaluate(() => window.location.href)
-              .then((url: string) => {
-                const domain = new URL(url).hostname;
-                
-                // Directly save the memory
-                saveReflectionMemory(content, domain, targetTabId);
-              })
-              .catch((error: any) => {
-                logWithTimestamp(`Error getting domain for reflection: ${error instanceof Error ? error.message : String(error)}`, 'error');
-              });
+            const url = await updatedTabState.page.url();
+            const domain = new URL(url).hostname;
+            
+            // Directly save the memory
+            saveReflectionMemory(content, domain, targetTabId);
           } catch (error) {
-            logWithTimestamp(`Error in domain extraction for reflection: ${error instanceof Error ? error.message : String(error)}`, 'error');
+            logWithTimestamp(`Error getting domain for reflection: ${error instanceof Error ? error.message : String(error)}`, 'error');
           }
         }
         
@@ -735,9 +993,9 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
         }
       },
       onToolOutput: (content) => {
-        // Normal handling for tool outputs
+        // Send tool outputs as LLM content so they get processed by LlmContent component
         sendUIMessage('updateOutput', {
-          type: 'system',
+          type: 'llm',
           content: content
         }, targetTabId);
       },
@@ -882,9 +1140,15 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
     
     // Execute the prompt with the agent
     const messageHistory = await getMessageHistory(targetTabId);
+    
+    // Modify the prompt for ask mode
+    const finalPrompt = askMode 
+      ? `You are in ASK mode. This means you should respond as a helpful AI assistant without using any browser automation tools. Just provide helpful, informative responses to the user's question: ${prompt}`
+      : prompt;
+    
     await executePromptWithFallback(
       agent, 
-      prompt, 
+      finalPrompt, 
       callbacks, 
       messageHistory
     );

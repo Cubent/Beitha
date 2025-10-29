@@ -121,15 +121,74 @@ export class GeminiProvider implements LLMProvider {
         // If this message has the same role as the previous one, combine them
         if (role === previousRole && processedMessages.length > 0) {
           const lastMsg = processedMessages[processedMessages.length - 1];
-          // Combine the content with a newline separator
-          const combinedText = lastMsg.parts[0].text + "\n\n" + msg.content;
-          lastMsg.parts[0].text = combinedText;
+          // Only combine if both messages are text-only
+          if (typeof msg.content === "string" && lastMsg.parts.length === 1 && lastMsg.parts[0].text) {
+            // Combine the content with a newline separator
+            const combinedText = lastMsg.parts[0].text + "\n\n" + msg.content;
+            lastMsg.parts[0].text = combinedText;
+          } else {
+            // For multimodal content or if last message was multimodal, add as new message
+            if (Array.isArray(msg.content)) {
+              // Handle multimodal content (text + images)
+              const parts: any[] = [];
+              for (const part of msg.content) {
+                if (part.type === "text") {
+                  parts.push({ text: part.text });
+                } else if (part.type === "image") {
+                  parts.push({
+                    inlineData: {
+                      mimeType: part.source.media_type,
+                      data: part.source.data
+                    }
+                  });
+                }
+              }
+              processedMessages.push({
+                role: role,
+                parts: parts
+              });
+            } else {
+              // Handle text-only content
+              processedMessages.push({
+                role: role,
+                parts: [{ text: msg.content }]
+              });
+            }
+            previousRole = role;
+          }
         } else {
           // Add as a new message
-          processedMessages.push({
-            role: role,
-            parts: [{ text: msg.content }]
-          });
+          if (Array.isArray(msg.content)) {
+            // Handle multimodal content (text + images)
+            const parts: any[] = [];
+            for (const part of msg.content) {
+              if (part.type === "text") {
+                parts.push({ text: part.text });
+              } else if (part.type === "image") {
+                console.log(`[GeminiProvider] Processing image part:`, {
+                  mimeType: part.source.media_type,
+                  dataLength: part.source.data.length,
+                  dataPreview: part.source.data.substring(0, 50) + '...'
+                });
+                parts.push({
+                  inlineData: {
+                    mimeType: part.source.media_type,
+                    data: part.source.data
+                  }
+                });
+              }
+            }
+            processedMessages.push({
+              role: role,
+              parts: parts
+            });
+          } else {
+            // Handle text-only content
+            processedMessages.push({
+              role: role,
+              parts: [{ text: msg.content }]
+            });
+          }
           previousRole = role;
         }
       }
@@ -152,8 +211,14 @@ export class GeminiProvider implements LLMProvider {
       // Convert to Gemini format
       let contents: Content[] = [];
 
-      // Use the processed messages
+      // Use the processed messages - Gemini expects the contents array directly
       contents = processedMessages;
+      
+      console.log(`[GeminiProvider] Final message structure for Gemini:`, {
+        contentsLength: contents.length,
+        hasImages: contents.some(msg => msg.parts?.some(part => part.inlineData)),
+        imageCount: contents.reduce((count, msg) => count + (msg.parts?.filter(part => part.inlineData).length || 0), 0)
+      });
 
     try {
       // Configure options

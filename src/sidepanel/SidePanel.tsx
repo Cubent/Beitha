@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBrain, faTrash, faQuestion, faCog } from '@fortawesome/free-solid-svg-icons';
 import { ConfigManager } from '../background/configManager';
 import { TokenTrackingService } from '../tracking/tokenTrackingService';
 import { ApprovalRequest } from './components/ApprovalRequest';
@@ -8,6 +10,8 @@ import { PromptForm } from './components/PromptForm';
 import { ProviderSelector } from './components/ProviderSelector';
 import { TabStatusBar } from './components/TabStatusBar';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
+import { extractTextFromPDF, formatPDFResult, PDFProcessingResult } from '../utils/pdfProcessor';
+import { WelcomeScreen } from './components/WelcomeScreen';
 import { useChromeMessaging } from './hooks/useChromeMessaging';
 import { useMessageManagement } from './hooks/useMessageManagement';
 import { useTabManagement } from './hooks/useTabManagement';
@@ -15,6 +19,12 @@ import { useTabManagement } from './hooks/useTabManagement';
 export function SidePanel() {
   // State for tab status
   const [tabStatus, setTabStatus] = useState<'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error'>('unknown');
+  
+  // State for mode switch (Ask vs Do) - load from storage
+  const [mode, setMode] = useState<'ask' | 'do'>('do');
+  
+  // State for globe functionality - active when in Do mode
+  const [isGlobeActive, setIsGlobeActive] = useState(true); // Start in Do mode
 
   // State for approval requests
   const [approvalRequests, setApprovalRequests] = useState<Array<{
@@ -26,6 +36,29 @@ export function SidePanel() {
 
   // State to track if any LLM providers are configured
   const [hasConfiguredProviders, setHasConfiguredProviders] = useState<boolean>(false);
+
+  // State for input value to handle welcome screen prompts
+  const [inputValue, setInputValue] = useState<string>('');
+  
+  // State for tab favicon
+  const [tabFavicon, setTabFavicon] = useState<string>('');
+
+  // Load saved mode from storage when component mounts
+  useEffect(() => {
+    const loadSavedMode = async () => {
+      try {
+        const result = await chrome.storage.local.get(['browserbee_mode']);
+        if (result.browserbee_mode) {
+          setMode(result.browserbee_mode);
+          setIsGlobeActive(result.browserbee_mode === 'do');
+        }
+      } catch (error) {
+        console.error('Error loading saved mode:', error);
+      }
+    };
+
+    loadSavedMode();
+  }, []);
 
   // Check if any providers are configured when component mounts
   useEffect(() => {
@@ -57,7 +90,25 @@ export function SidePanel() {
     windowId,
     tabTitle,
     setTabTitle
-  } = useTabManagement();
+  } = useTabManagement(mode);
+
+  // Fetch favicon when tabId changes
+  useEffect(() => {
+    if (!tabId) return;
+    
+    chrome.tabs.get(tabId, (tab) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error getting tab for favicon:', chrome.runtime.lastError);
+        return;
+      }
+      
+      if (tab && tab.favIconUrl) {
+        setTabFavicon(tab.favIconUrl);
+      } else {
+        setTabFavicon('');
+      }
+    });
+  }, [tabId]);
 
   const {
     messages,
@@ -69,6 +120,7 @@ export function SidePanel() {
     addMessage,
     addSystemMessage,
     updateStreamingChunk,
+    startStreaming,
     finalizeStreamingSegment,
     startNewSegment,
     completeStreaming,
@@ -212,17 +264,262 @@ export function SidePanel() {
     }
   });
 
+  // Function to compress images to fit Chrome extension limits
+  const compressImages = async (imageData: { type: string; source: { type: string; media_type: string; data: string } }[], targetSizeBytes: number) => {
+    const compressedImages = [];
+    
+    for (const img of imageData) {
+      let compressedData = img.source.data;
+      let quality = 0.8; // Start with 80% quality
+      
+      // Keep compressing until we're under the target size
+      while (compressedData.length > targetSizeBytes / imageData.length && quality > 0.1) {
+        try {
+          // Create a canvas to compress the image
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const imgElement = new Image();
+          
+          await new Promise((resolve, reject) => {
+            imgElement.onload = () => {
+              // Calculate new dimensions (reduce by 10% each iteration)
+              const scale = Math.sqrt(targetSizeBytes / imageData.length / (imgElement.width * imgElement.height * 4));
+              canvas.width = Math.max(100, imgElement.width * scale);
+              canvas.height = Math.max(100, imgElement.height * scale);
+              
+              // Draw and compress
+              ctx?.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
+              const compressedBase64 = canvas.toDataURL(img.source.media_type, quality).split(',')[1];
+              compressedData = compressedBase64;
+              resolve(compressedBase64);
+            };
+            imgElement.onerror = reject;
+            imgElement.src = `data:${img.source.media_type};base64,${img.source.data}`;
+          });
+          
+          quality -= 0.1; // Reduce quality for next iteration
+        } catch (error) {
+          console.error('Error compressing image:', error);
+          break;
+        }
+      }
+      
+      compressedImages.push({
+        ...img,
+        source: {
+          ...img.source,
+          data: compressedData
+        }
+      });
+    }
+    
+    return compressedImages;
+  };
+
   // Handle form submission
-  const handleSubmit = async (prompt: string) => {
+  const handleSubmit = async (prompt: string, files?: File[], images?: string[]) => {
+    console.log('handleSubmit received:', { prompt, files: files?.length, images: images?.length });
     setIsProcessing(true);
+    startStreaming(); // Start streaming immediately
     // Update the tab status to running
     setTabStatus('running');
 
-    // Add a system message to indicate a new prompt
-    addSystemMessage(`New prompt: "${prompt}"`);
+    // Add user message to the chat with file info
+    let messageContent = prompt;
+    if (files && files.length > 0) {
+      const fileNames = files.map(f => f.name).join(', ');
+      messageContent += `\n\n[Attached files: ${fileNames}]`;
+    }
+    if (images && images.length > 0) {
+      messageContent += `\n\n[Attached images: ${images.length} image(s)]`;
+    }
+    addMessage({ type: 'user', content: messageContent, attachedFiles: files, images: images });
+
+    // Process files if any
+    let fileContents = '';
+    let hasImages = false;
+    let imageData: { type: string; source: { type: string; media_type: string; data: string } }[] = [];
+    
+    // Gemini 2.5 Flash limits
+    const MAX_IMAGES = 3000;
+    const MAX_IMAGE_SIZE = 7 * 1024 * 1024; // 7MB in bytes
+    const SUPPORTED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+    // Process images from data URLs (drag & drop images) - Convert to Anthropic image block format
+    if (images && images.length > 0) {
+      hasImages = true;
+      
+      // Validate image count (max 5 per message as per architecture)
+      const MAX_IMAGES_PER_MESSAGE = 5;
+      const limitedImages = images.slice(0, MAX_IMAGES_PER_MESSAGE);
+      
+      for (let index = 0; index < limitedImages.length; index++) {
+        const dataURL = limitedImages[index];
+        try {
+          // Parse data URL to get MIME type and base64 data
+          const [header, base64Data] = dataURL.split(',');
+          const mimeType = header.match(/data:([^;]+)/)?.[1];
+          
+          if (!mimeType || !SUPPORTED_MIME_TYPES.includes(mimeType)) {
+            console.warn(`Unsupported image type: ${mimeType}`);
+            continue;
+          }
+
+          // Calculate size from base64 data
+          const sizeInBytes = (base64Data.length * 3) / 4;
+          if (sizeInBytes > MAX_IMAGE_SIZE) {
+            console.warn(`Image too large: ${sizeInBytes} bytes. Maximum allowed: ${MAX_IMAGE_SIZE} bytes`);
+            continue;
+          }
+
+          // Calculate estimated tokens for image (square root formula with 1.5x fudge factor)
+          const estimatedTokens = Math.ceil(Math.sqrt(sizeInBytes) * 1.5);
+
+          // Convert to Anthropic image block format
+          imageData.push({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: mimeType,
+              data: base64Data
+            }
+          });
+        } catch (error) {
+          console.error('Error processing image data URL:', error);
+        }
+      }
+    }
+    
+    if (files && files.length > 0) {
+      // Validate file counts
+      const imageFiles = files.filter(f => f.type.startsWith('image/'));
+      const pdfFiles = files.filter(f => f.type === 'application/pdf');
+      
+      if (imageFiles.length > MAX_IMAGES) {
+        addSystemMessage(`Error: Maximum ${MAX_IMAGES} images allowed per request. You uploaded ${imageFiles.length} images.`);
+        return;
+      }
+      
+      if (pdfFiles.length > 3) {
+        addSystemMessage(`Error: Maximum 3 PDF files allowed per request. You uploaded ${pdfFiles.length} PDFs.`);
+        return;
+      }
+      
+      for (const file of files) {
+        try {
+          if (file.type === 'application/pdf') {
+            // Process PDF file silently
+            const pdfResult = await extractTextFromPDF(file, 25000);
+            
+            if (!pdfResult.success) {
+              addSystemMessage(`❌ ${pdfResult.error}`);
+              continue; // Skip this file and continue with others
+            }
+            
+            // Add the extracted text to file contents
+            fileContents += `\n\n[PDF Document: ${file.name}]\n${pdfResult.text}`;
+            
+          } else if (file.type.startsWith('image/')) {
+            // Validate MIME type
+            if (!SUPPORTED_MIME_TYPES.includes(file.type)) {
+              addSystemMessage(`Error: Unsupported image format ${file.type}. Supported formats: PNG, JPEG, WebP`);
+              return;
+            }
+            
+            // Validate file size
+            if (file.size > MAX_IMAGE_SIZE) {
+              addSystemMessage(`Error: Image ${file.name} is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Maximum size is 7MB.`);
+              return;
+            }
+            
+            // For images, convert to base64 and prepare for vision API
+            const base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = reader.result as string;
+                // Remove the data:image/...;base64, prefix
+                const base64Data = result.split(',')[1];
+                resolve(base64Data);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+            
+            imageData.push({
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: file.type,
+                data: base64
+              }
+            });
+            hasImages = true;
+            fileContents += `\n\n[Image: ${file.name}]`;
+          } else {
+            // For text files, read the content
+            const text = await file.text();
+            fileContents += `\n\n[Document: ${file.name}]\n${text}`;
+          }
+        } catch (error) {
+          console.error('Error processing file:', error);
+          fileContents += `\n\n[Error reading file: ${file.name}]`;
+        }
+      }
+    }
+
+    const fullPrompt = prompt + fileContents;
+
+    // Calculate total message size to check Chrome extension limits
+    const totalImageSize = imageData.reduce((total, img) => total + (img.source?.data?.length || 0), 0);
+    const estimatedMessageSize = JSON.stringify({ prompt: fullPrompt, imageData }).length;
+    
+    console.log('Final imageData being sent:', { 
+      hasImages, 
+      imageDataLength: imageData.length, 
+      totalImageSize,
+      estimatedMessageSize,
+      exceedsChromeLimit: estimatedMessageSize > 1024 * 1024, // 1MB limit
+      imageData: imageData.map(img => ({
+        type: img.type,
+        sourceType: img.source.type,
+        mediaType: img.source.media_type,
+        dataLength: img.source.data.length,
+        dataPreview: img.source.data.substring(0, 50) + '...'
+      }))
+    });
+    
+    // Warn if message might be too large for Chrome extension
+    if (estimatedMessageSize > 1024 * 1024) {
+      console.warn(`[SidePanel] Message size (${estimatedMessageSize} bytes) exceeds Chrome extension 1MB limit!`);
+      
+      // Try to compress images to fit Chrome extension limits
+      if (hasImages) {
+        console.log(`[SidePanel] Attempting to compress images to fit Chrome extension limits...`);
+        addSystemMessage(`Image is too large (${Math.round(estimatedMessageSize / 1024)}KB). Compressing to fit Chrome extension limits...`);
+        
+        // Compress images by reducing quality
+        const compressedImageData = await compressImages(imageData, 1024 * 1024); // Target 1MB
+        imageData = compressedImageData;
+        
+        const newEstimatedSize = JSON.stringify({ prompt: fullPrompt, imageData }).length;
+        console.log(`[SidePanel] After compression: ${newEstimatedSize} bytes (was ${estimatedMessageSize} bytes)`);
+        
+        if (newEstimatedSize > 1024 * 1024) {
+          addSystemMessage(`Warning: Image is still too large after compression. Consider using a smaller image.`);
+        } else {
+          addSystemMessage(`Image compressed successfully. Proceeding with analysis...`);
+        }
+      }
+    }
 
     try {
-      await executePrompt(prompt);
+      if (mode === 'ask') {
+        // Ask mode - just chat without tools
+        await executePrompt(fullPrompt, true, hasImages ? imageData : undefined); // Pass true to indicate ask mode
+      } else {
+        // Do mode - use browser automation tools
+        await executePrompt(fullPrompt, false, hasImages ? imageData : undefined);
+      }
     } catch (error) {
       console.error('Error:', error);
       addSystemMessage('Error: ' + (error instanceof Error ? error.message : String(error)));
@@ -255,6 +552,56 @@ export function SidePanel() {
     setTabStatus('idle');
   };
 
+  // Handle globe click - toggle between Ask and Do modes
+  const handleGlobeClick = async () => {
+    const newMode = mode === 'ask' ? 'do' : 'ask';
+    setMode(newMode);
+    setIsGlobeActive(newMode === 'do');
+    
+    // Save the mode to storage
+    try {
+      await chrome.storage.local.set({ browserbee_mode: newMode });
+    } catch (error) {
+      console.error('Error saving mode:', error);
+    }
+  };
+
+  // Handle attach to current tab
+  const handleAttachClick = async () => {
+    try {
+      // Get the current tab ID and title
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      if (tabs && tabs[0] && tabs[0].id) {
+        const activeTabId = tabs[0].id;
+        const windowId = tabs[0].windowId;
+        const activeTabTitle = tabs[0].title || 'Unknown Tab';
+
+        // Initialize tab attachment
+        chrome.runtime.sendMessage({
+          action: 'initializeTab',
+          tabId: activeTabId,
+          windowId: windowId
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error('Error initializing tab:', chrome.runtime.lastError);
+          } else if (response && response.success) {
+            console.log(`Tab ${activeTabId} in window ${windowId} initialized successfully`);
+            // Update the tab title and status
+            setTabTitle(activeTabTitle);
+            setTabStatus('attached');
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error attaching to current tab:', error);
+    }
+  };
+
+  // Handle welcome screen prompt click
+  const handlePromptClick = (prompt: string) => {
+    setInputValue(prompt);
+  };
+
   // Handle clearing history
   const handleClearHistory = () => {
     clearMessages();
@@ -283,45 +630,65 @@ export function SidePanel() {
   };
 
   return (
-    <div className="flex flex-col h-screen p-4 bg-base-200">
+    <div className="flex flex-col h-screen p-4 bg-white" style={{ border: 'none', outline: 'none' }}>
       <header className="mb-4">
         <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary">BrowserBee 🐝</h1>
-        <TabStatusBar
-          tabId={tabId}
-          tabTitle={tabTitle}
-          tabStatus={tabStatus}
-        />
-      </div>
-      <p className="text-sm text-gray-600 mt-2">
-          What can I do for you today?
-        </p>
+          <TabStatusBar
+            tabId={tabId}
+            tabTitle={tabTitle}
+            tabStatus={tabStatus}
+          />
+          {/* Buttons hidden per user request */}
+          {/* <div className="flex items-center gap-2">
+            <div className="tooltip tooltip-bottom" data-tip="Reflect and learn from this session">
+              <button 
+                onClick={handleReflectAndLearn}
+                className="btn btn-xs btn-outline btn-primary"
+                disabled={isProcessing}
+              >
+                <FontAwesomeIcon icon={faBrain} />
+              </button>
+            </div>
+            <div className="tooltip tooltip-bottom" data-tip="Clear conversation history and LLM context">
+              <button 
+                onClick={handleClearHistory}
+                className="btn btn-xs btn-outline"
+                disabled={isProcessing}
+              >
+                <FontAwesomeIcon icon={faTrash} />
+              </button>
+            </div>
+          </div> */}
+        </div>
       </header>
 
       {hasConfiguredProviders ? (
         <>
-          <div className="flex flex-col flex-grow gap-4 overflow-hidden md:flex-row shadow-sm">
-            <div className="card bg-base-100 shadow-md flex-1 flex flex-col overflow-hidden">
-              <OutputHeader
-                onClearHistory={handleClearHistory}
-                onReflectAndLearn={handleReflectAndLearn}
-                isProcessing={isProcessing}
-              />
+          <div className="flex flex-col flex-grow gap-4 overflow-hidden md:flex-row">
+            <div className="bg-white flex-1 flex flex-col overflow-hidden">
               <div
                 ref={outputRef}
-                className="card-body p-3 overflow-auto bg-base-100 flex-1"
+                className="p-3 overflow-auto bg-white flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+                style={{
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#d1d5db #f3f4f6'
+                }}
               >
-                <MessageDisplay
-                  messages={messages}
-                  streamingSegments={streamingSegments}
-                  isStreaming={isStreaming}
-                />
+                {messages.length === 0 && !isStreaming ? (
+                  <WelcomeScreen onPromptClick={handlePromptClick} />
+                ) : (
+                  <MessageDisplay
+                    messages={messages}
+                    streamingSegments={streamingSegments}
+                    isStreaming={isStreaming}
+                    currentPageTitle={tabTitle}
+                    currentPageUrl={tabId ? `Tab ${tabId}` : undefined}
+                  />
+                )}
               </div>
             </div>
           </div>
 
-          {/* Add Token Usage Display */}
-          <TokenUsageDisplay />
 
           {/* Display approval requests */}
           {approvalRequests.map(req => (
@@ -336,13 +703,26 @@ export function SidePanel() {
             />
           ))}
 
-          <PromptForm
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-            isProcessing={isProcessing}
-            tabStatus={tabStatus}
-          />
+           <PromptForm
+             onSubmit={handleSubmit}
+             onCancel={handleCancel}
+             isProcessing={isProcessing}
+             tabStatus={tabStatus}
+             mode={mode}
+             onGlobeClick={handleGlobeClick}
+             isGlobeActive={isGlobeActive}
+             currentTabTitle={tabTitle}
+             currentTabFavicon={tabFavicon}
+             onAttachClick={handleAttachClick}
+             inputValue={inputValue}
+             onInputValueChange={setInputValue}
+           />
+          
+          
           <ProviderSelector isProcessing={isProcessing} />
+          
+          {/* Token Usage Display - Hidden per user request */}
+          {/* <TokenUsageDisplay /> */}
         </>
       ) : (
         <div className="flex flex-col flex-grow items-center justify-center">

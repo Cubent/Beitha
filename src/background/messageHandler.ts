@@ -177,11 +177,19 @@ function handleExecutePrompt(
   message: Extract<BackgroundMessage, { action: 'executePrompt' }>,
   sendResponse: (response?: any) => void
 ): void {
+  console.log(`[MessageHandler] Received executePrompt message:`, {
+    hasImageData: !!(message.imageData && message.imageData.length > 0),
+    imageDataLength: message.imageData?.length || 0,
+    imageDataSize: message.imageData?.reduce((total, img) => total + (img.source?.data?.length || 0), 0) || 0,
+    promptLength: message.prompt.length,
+    askMode: message.askMode
+  });
+  
   // Use the tabId from the message if available
   if (message.tabId) {
-    executePrompt(message.prompt, message.tabId);
+    executePrompt(message.prompt, message.tabId, false, message.askMode, message.imageData);
   } else {
-    executePrompt(message.prompt);
+    executePrompt(message.prompt, undefined, false, message.askMode, message.imageData);
   }
   sendResponse({ success: true });
 }
@@ -260,16 +268,7 @@ function handleInitializeTab(
         // Get the tab state to check if attachment was successful
         const tabState = getTabState(message.tabId);
         if (tabState) {
-          // Send a message back to the side panel with the tab title
-          chrome.runtime.sendMessage({
-            action: 'updateOutput',
-            content: {
-              type: 'system',
-              content: `Connected to tab: ${tabState.title || tabTitle}`
-            },
-            tabId: message.tabId,
-            windowId: tabState.windowId
-          });
+          // Tab connection successful (no UI message needed)
         }
         
         logWithTimestamp(`Tab ${message.tabId} in window ${message.windowId || 'unknown'} initialized from side panel`);
@@ -431,17 +430,13 @@ async function handleCheckAgentStatus(
     const { getAgentStatus } = await import('./agentController');
     const status = getAgentStatus(windowId);
     
-    // Send the status back to the UI
-    chrome.runtime.sendMessage({
-      action: 'agentStatusUpdate',
+    // Return the status directly in the response
+    sendResponse({ 
+      success: true, 
       status: status.status,
       timestamp: status.timestamp,
-      lastHeartbeat: status.lastHeartbeat,
-      tabId: message.tabId,
-      windowId
+      lastHeartbeat: status.lastHeartbeat
     });
-    
-    sendResponse({ success: true });
   } catch (error) {
     const errorMessage = handleError(error, 'checking agent status');
     logWithTimestamp(`Error checking agent status: ${errorMessage}`, 'error');

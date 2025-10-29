@@ -297,9 +297,9 @@ async function correctReflectionJSON(malformedJson: string, error: Error, domain
         }
       },
       onToolOutput: (content) => {
-        // Pass through tool outputs
+        // Send tool outputs as LLM content so they get processed by LlmContent component
         sendUIMessage('updateOutput', {
-          type: 'system',
+          type: 'llm',
           content: content
         }, tabId);
       },

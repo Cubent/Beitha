@@ -226,7 +226,7 @@ export const useChromeMessaging = ({
     onAgentStatusUpdate
   ]);
 
-  const executePrompt = (prompt: string) => {
+  const executePrompt = (prompt: string, askMode: boolean = false, imageData?: { type: string; source: { type: string; media_type: string; data: string } }[]) => {
     return new Promise<void>((resolve, reject) => {
       try {
         // Send message to background script with tab ID
@@ -234,7 +234,9 @@ export const useChromeMessaging = ({
           action: 'executePrompt',
           prompt,
           tabId,
-          windowId
+          windowId,
+          askMode,
+          imageData
         }, () => {
           const lastError = chrome.runtime.lastError;
           if (lastError) {

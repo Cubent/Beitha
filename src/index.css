@@ -1,2 +1,282 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
 @plugin "daisyui";
+
+/* Custom thin scrollbar styles */
+.overflow-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-auto::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Firefox scrollbar */
+.overflow-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+@theme inline {
+  --animate-fade-scale: fade-scale 0.2s ease-out;
+
+  @keyframes fade-scale {
+    0% {
+      opacity: 0;
+      transform: translateY(-50%) scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(-50%) scale(1);
+    }
+  }
+  @keyframes fade-scale {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.95);
+    }
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+    }
+  }
+  @keyframes fade-scale {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.95);
+    }
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+    }
+  }
+  @keyframes fade-scale {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.95);
+    }
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+    }
+  }
+  @keyframes morph-0 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    border-radius: 0%;
+    }
+  25% {
+    transform: translate(20px, -20px) scale(1.2);
+    border-radius: 50%;
+    }
+  50% {
+    transform: translate(40px, 0) scale(0.8);
+    border-radius: 25%;
+    }
+  75% {
+    transform: translate(20px, 20px) scale(1.1);
+    border-radius: 75%;
+    }
+  }
+  @keyframes morph-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    border-radius: 0%;
+    }
+  25% {
+    transform: translate(-20px, -20px) scale(1.3) rotate(90deg);
+    border-radius: 50%;
+    }
+  50% {
+    transform: translate(-40px, 0) scale(0.7) rotate(180deg);
+    border-radius: 25%;
+    }
+  75% {
+    transform: translate(-20px, 20px) scale(1.2) rotate(270deg);
+    border-radius: 75%;
+    }
+  }
+  @keyframes morph-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    border-radius: 0%;
+    }
+  25% {
+    transform: translate(-20px, 20px) scale(0.9);
+    border-radius: 100%;
+    }
+  50% {
+    transform: translate(0, 40px) scale(1.4);
+    border-radius: 0%;
+    }
+  75% {
+    transform: translate(20px, 20px) scale(0.8);
+    border-radius: 50%;
+    }
+  }
+  @keyframes morph-3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    border-radius: 0%;
+    }
+  25% {
+    transform: translate(20px, 20px) scale(1.1) rotate(-90deg);
+    border-radius: 25%;
+    }
+  50% {
+    transform: translate(0, -40px) scale(1.3) rotate(-180deg);
+    border-radius: 100%;
+    }
+  75% {
+    transform: translate(-20px, -20px) scale(0.9) rotate(-270deg);
+    border-radius: 75%;
+    }
+  }
+  @keyframes typing {
+  0%,
+100% {
+    transform: translateY(0);
+    opacity: 0.5;
+    }
+  50% {
+    transform: translateY(-2px);
+    opacity: 1;
+    }
+  }
+  @keyframes loading-dots {
+  0%,
+100% {
+    opacity: 0;
+    }
+  50% {
+    opacity: 1;
+    }
+  }
+  @keyframes wave {
+  0%,
+100% {
+    transform: scaleY(1);
+    }
+  50% {
+    transform: scaleY(0.6);
+    }
+  }
+  @keyframes blink {
+  0%,
+100% {
+    opacity: 1;
+    }
+  50% {
+    opacity: 0;
+    }
+  }
+  @keyframes text-blink {
+  0%,
+100% {
+    color: var(--primary);
+    }
+  50% {
+    color: var(--muted-foreground);
+    }
+  }
+  @keyframes bounce-dots {
+  0%,
+100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+    }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+    }
+  }
+  @keyframes thin-pulse {
+  0%,
+100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+    }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.4;
+    }
+  }
+  @keyframes pulse-dot {
+  0%,
+100% {
+    transform: scale(1);
+    opacity: 0.8;
+    }
+  50% {
+    transform: scale(1.5);
+    opacity: 1;
+    }
+  }
+  @keyframes shimmer-text {
+  0% {
+    background-position: 150% center;
+    }
+  100% {
+    background-position: -150% center;
+    }
+  }
+  @keyframes wave-bars {
+  0%,
+100% {
+    transform: scaleY(1);
+    opacity: 0.5;
+    }
+  50% {
+    transform: scaleY(0.6);
+    opacity: 1;
+    }
+  }
+  @keyframes shimmer {
+  0% {
+    background-position: 200% 50%;
+    }
+  100% {
+    background-position: -200% 50%;
+    }
+  }
+  @keyframes spinner-fade {
+  0% {
+    opacity: 0;
+    }
+  100% {
+    opacity: 1;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply outline-gray-300/50;
+  }
+  body {
+    @apply bg-white text-gray-900;
+  }
+  html, body {
+    border: none !important;
+    outline: none !important;
+  }
+  #root {
+    border: none !important;
+    outline: none !important;
+  }
+}

@@ -119,7 +119,9 @@ export function ProviderSelector({ isProcessing }: ProviderSelectorProps) {
       }
       
       // Reload the page to apply changes
-      window.location.reload();
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     }
   };
   
@@ -134,7 +136,9 @@ export function ProviderSelector({ isProcessing }: ProviderSelectorProps) {
   
   // Function to open help documentation
   const openHelpPage = () => {
-    window.open('https://parsaghaffari.github.io/browserbee/', '_blank');
+    if (typeof window !== 'undefined') {
+      window.open('https://parsaghaffari.github.io/browserbee/', '_blank');
+    }
   };
 
   return (
@@ -166,14 +170,6 @@ export function ProviderSelector({ isProcessing }: ProviderSelectorProps) {
           ))}
         </select>
       </div>
-      <button 
-        className="btn btn-ghost btn-xs p-1" 
-        onClick={openHelpPage}
-        title="Open Help"
-        disabled={isProcessing}
-      >
-        <FontAwesomeIcon icon={faCircleInfo} className="text-gray-500 hover:text-gray-700" />
-      </button>
     </div>
   );
 }

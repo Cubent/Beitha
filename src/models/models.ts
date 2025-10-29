@@ -184,6 +184,16 @@ export const openaiModels = {
     supportsPromptCache: true,
     cacheReadsPrice: 1.25,
   },
+  "gpt-4o-mini": {
+    name: "GPT-4o Mini",
+    inputPrice: 0.15,
+    outputPrice: 0.6,
+    maxTokens: 16384,
+    contextWindow: 128000,
+    supportsImages: true,
+    supportsPromptCache: true,
+    cacheReadsPrice: 0.075,
+  },
   "o3": {
     name: "o3",
     inputPrice: 2.0,

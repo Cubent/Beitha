@@ -14,7 +14,7 @@ export const OutputHeader: React.FC<OutputHeaderProps> = ({
   isProcessing
 }) => {
   return (
-    <div className="flex justify-between items-center bg-base-300 p-3">
+    <div className="flex justify-between items-center bg-white p-3">
       <div className="card-title text-base-content text-lg">
         Output
       </div>

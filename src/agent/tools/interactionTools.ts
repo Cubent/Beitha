@@ -11,7 +11,26 @@ export const browserClick: ToolFactory = (page: Page) =>
     func: async (input: string) => {
       try {
         return await withActivePage(page, async (activePage) => {
-          if (/[#.[]/.test(input)) {
+          // Check if input looks like a CSS selector (contains CSS selector patterns)
+          const isCssSelector = /[#.[*=:>+~]/.test(input) || 
+                               input.includes(' ') || 
+                               input.includes('>') || 
+                               input.includes('+') || 
+                               input.includes('~') ||
+                               input.startsWith('a[') ||
+                               input.startsWith('div[') ||
+                               input.startsWith('button[') ||
+                               input.startsWith('input[') ||
+                               input.startsWith('span[') ||
+                               input.startsWith('p[') ||
+                               input.startsWith('h1[') ||
+                               input.startsWith('h2[') ||
+                               input.startsWith('h3[') ||
+                               input.startsWith('h4[') ||
+                               input.startsWith('h5[') ||
+                               input.startsWith('h6[');
+          
+          if (isCssSelector) {
             await activePage.click(input);
             return `Clicked selector: ${input}`;
           }

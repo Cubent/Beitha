@@ -24,6 +24,8 @@ export interface ExecutePromptMessage {
   prompt: string;
   tabId?: number;
   windowId?: number;
+  askMode?: boolean;
+  imageData?: { type: string; source: { type: string; media_type: string; data: string } }[];
 }
 
 export interface CancelExecutionMessage {

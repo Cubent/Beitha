@@ -11,6 +11,7 @@ import { ToolManager } from "./ToolManager";
 import { getAllTools } from "./tools/index";
 import { BrowserTool, ToolExecutionContext } from "./tools/types";
 // Define our own DynamicTool interface to avoid import issues
+// Define our own DynamicTool interface to avoid import issues
 interface DynamicTool {
   name: string;
   description: string;
@@ -44,7 +45,7 @@ export class BrowserAgent {
   /**
    * Create a new BrowserAgent
    */
-  constructor(page: Page, config: ProviderConfig, provider?: LLMProvider) {
+  constructor(page: Page, config: ProviderConfig, provider?: LLMProvider, askMode: boolean = false) {
     // Initialize the PageContextManager with the initial page
     initializePageContext(page);
 
@@ -52,12 +53,13 @@ export class BrowserAgent {
     this.llmProvider = provider!;
 
     // Get all tools from the tools module and convert them to BrowserTool objects
-    const rawTools = getAllTools(page);
+    // In ask mode, we don't provide any tools
+    const rawTools = askMode ? [] : getAllTools(page);
     const browserTools = this.convertToBrowserTools(rawTools);
 
     // Initialize all the components
     this.toolManager = new ToolManager(page, browserTools);
-    this.promptManager = new PromptManager(this.toolManager.getTools());
+    this.promptManager = new PromptManager(this.toolManager.getTools(), askMode);
     this.memoryManager = new MemoryManager(this.toolManager.getTools());
     this.errorHandler = new ErrorHandler();
 
@@ -174,7 +176,8 @@ export class BrowserAgent {
  */
 export async function createBrowserAgent(
   page: Page,
-  apiKey: string
+  apiKey: string,
+  askMode: boolean = false
 ): Promise<BrowserAgent> {
   // Get provider configuration
   const configManager = ConfigManager.getInstance();
@@ -214,7 +217,7 @@ export async function createBrowserAgent(
   });
 
   // Create the agent with the provider configuration and provider
-  return new BrowserAgent(page, providerConfig, provider);
+  return new BrowserAgent(page, providerConfig, provider, askMode);
 }
 
 /**

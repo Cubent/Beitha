@@ -36,7 +36,7 @@ export class ConfigManager {
       openaiModelId: 'gpt-4o',
       openaiBaseUrl: '',
       geminiApiKey: '',
-      geminiModelId: 'gemini-1.5-pro',
+      geminiModelId: 'gemini-2.5-flash-preview-05-20',
       geminiBaseUrl: '',
       ollamaApiKey: '',
       ollamaModelId: '',
