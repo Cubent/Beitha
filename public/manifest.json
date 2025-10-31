@@ -1,5 +1,5 @@
 {
-  "name": "BrowserBee 🐝",
+  "name": "Beitha",
   "version": "0.2.0",
   "manifest_version": 3,
   "background": {
@@ -12,7 +12,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "BrowserBee 🐝",
+    "default_title": "Beitha",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -22,8 +22,16 @@
   "side_panel": {
     "default_path": "sidepanel.html"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/quickPrompt.js"],
+      "run_at": "document_end",
+      "all_frames": true
+    }
+  ],
   "options_page": "options.html",
-  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands"],
+  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands", "contextMenus"],
   "host_permissions": ["<all_urls>"],
   "commands": {
     "_execute_action": {
@@ -31,7 +39,7 @@
         "default": "Alt+Shift+B",
         "mac": "Alt+Shift+B"
       },
-      "description": "Open the BrowserBee side panel",
+      "description": "Open the Beitha side panel",
       "global": false
     }
   }

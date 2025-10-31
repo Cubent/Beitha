@@ -6,7 +6,7 @@ export function AboutSection() {
       <div className="card-body">
         <h2 className="card-title text-xl">About</h2>
         <p className="mb-3">
-          BrowserBee 🐝 is a Chrome extension that allows you to control your browser using natural language.
+          Beitha 🐝 is a Chrome extension that allows you to control your browser using natural language.
           It supports multiple LLM providers including Anthropic, OpenAI, Google Gemini, and Ollama to interpret your instructions and uses Playwright to execute them.
         </p>
         <p>

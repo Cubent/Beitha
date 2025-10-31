@@ -169,6 +169,24 @@ export interface TokenUsageUpdatedMessage {
   windowId?: number;
 }
 
+export interface SetPromptMessage {
+  action: 'setPrompt';
+  prompt: string;
+  tabId?: number;
+  windowId?: number;
+}
+
+export interface QuickPromptMessage {
+  action: 'quickPrompt';
+  text: string;
+  tabId?: number;
+}
+
+export interface OpenSidePanelMessage {
+  action: 'openSidePanel';
+  tabId?: number;
+}
+
 export interface ProviderConfigChangedMessage {
   action: 'providerConfigChanged';
   tabId?: number;
@@ -215,6 +233,9 @@ export type BackgroundMessage =
   | ReflectAndLearnMessage
   | TokenUsageUpdatedMessage
   | UpdateOutputMessage
+  | SetPromptMessage
+  | QuickPromptMessage
+  | OpenSidePanelMessage
   | ProviderConfigChangedMessage
   | ForceResetPlaywrightMessage
   | RequestApprovalMessage

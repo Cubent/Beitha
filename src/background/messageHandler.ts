@@ -7,7 +7,22 @@ import { initializeAgent } from './agentController';
 import { triggerReflection } from './reflectionController';
 import { attachToTab, getTabState, getWindowForTab, forceResetPlaywright } from './tabManager';
 import { BackgroundMessage } from './types';
-import { logWithTimestamp, handleError } from './utils';
+import { logWithTimestamp, handleError, sendUIMessage } from './utils';
+import backgroundModule from './index';
+
+// De-dupe guard for quickPrompt autosend per tab
+const quickPromptLastExecByTab = new Map<number, number>();
+function executeOnceAskMode(tabId: number, prompt: string): void {
+  const now = Date.now();
+  const last = quickPromptLastExecByTab.get(tabId) || 0;
+  // 3s window to prevent duplicate sends
+  if (now - last < 3000) {
+    logWithTimestamp(`Skipping duplicate execute for tab ${tabId}`);
+    return;
+  }
+  quickPromptLastExecByTab.set(tabId, now);
+  chrome.runtime.sendMessage({ action: 'executePrompt', prompt, tabId, askMode: true });
+}
 
 /**
  * Handle messages from the UI
@@ -85,6 +100,77 @@ export function handleMessage(
         sendResponse({ success: true });
         return true;
         
+      case 'setPrompt':
+        // Just pass through setPrompt messages
+        // This allows context menu to set prompt in side panel
+        sendResponse({ success: true });
+        return true;
+        
+      case 'openSidePanel':
+        (async () => {
+          try {
+            let tabId = (message as any).tabId as number | undefined;
+            if (!tabId && sender.tab?.id) tabId = sender.tab.id;
+            if (!tabId) {
+              const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+              tabId = tabs[0]?.id;
+            }
+            if (!tabId) { sendResponse({ success: false, error: 'No tabId' }); return; }
+            await chrome.sidePanel.open({ tabId });
+            sendResponse({ success: true });
+          } catch (e) {
+            const err = handleError(e, 'openSidePanel');
+            logWithTimestamp(err, 'warn');
+            sendResponse({ success: false, error: err });
+          }
+        })();
+        return true;
+
+      case 'quickPrompt':
+        // Handle quick prompt from content script – robustly determine tabId and route
+        (async () => {
+          try {
+            const text = (message as any).text as string | undefined;
+            let tabId = (message as any).tabId as number | undefined;
+            if (!tabId && sender.tab?.id) tabId = sender.tab.id;
+            if (!tabId) {
+              const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+              tabId = tabs[0]?.id;
+            }
+            if (!text || !tabId) {
+              sendResponse({ success: false, error: 'Missing text or tab ID' });
+              return;
+            }
+
+            // Open the side panel first
+            try { await chrome.sidePanel.open({ tabId }); } catch (e) {
+              logWithTimestamp(`Error opening side panel: ${String(e)}`, 'warn');
+            }
+
+            // Immediately show the user's message for responsiveness
+            try {
+              sendUIMessage('updateOutput', { type: 'user', content: text }, tabId);
+            } catch { /* no-op */ }
+
+            // Store for polling fallback
+            await chrome.storage.local.set({
+              pendingPrompt: { prompt: text, timestamp: Date.now(), tabId }
+            });
+
+            // Prefill after a short delay (do NOT autosend here; autosend should come from prompt if desired)
+            setTimeout(() => {
+              chrome.runtime.sendMessage({ action: 'setPrompt', prompt: text, tabId });
+            }, 400);
+
+            sendResponse({ success: true });
+          } catch (err) {
+            const errorMessage = handleError(err, 'handling quickPrompt');
+            logWithTimestamp(`quickPrompt error: ${errorMessage}`, 'error');
+            sendResponse({ success: false, error: errorMessage });
+          }
+        })();
+        return true;
+        
       case 'providerConfigChanged':
         // Just pass through provider configuration change notifications
         // This allows the ProviderSelector component to refresh
@@ -151,19 +237,28 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
       message.action === 'approvalResponse' ||
       message.action === 'reflectAndLearn' ||
       message.action === 'tokenUsageUpdated' ||  // Add support for token usage updates
-      message.action === 'updateOutput' ||  // Add support for output updates
+      message.action === 'updateOutput' ||       // Add support for output updates
       message.action === 'providerConfigChanged' ||  // Add support for provider config changes
       message.action === 'tabStatusChanged' ||
       message.action === 'targetCreated' ||
       message.action === 'targetDestroyed' ||
       message.action === 'targetChanged' ||
-      message.action === 'tabTitleChanged' ||
-      message.action === 'pageDialog' ||
-      message.action === 'pageConsole' ||
-      message.action === 'pageError' ||
+      message.action === 'agentStatusUpdate' ||
+      message.action === 'updateStreamingChunk' ||
+      message.action === 'finalizeStreamingSegment' ||
+      message.action === 'startNewSegment' ||
+      message.action === 'streamingComplete' ||
+      message.action === 'updateLlmOutput' ||
+      message.action === 'rateLimit' ||
+      message.action === 'fallbackStarted' ||
+      message.action === 'updateScreenshot' ||
+      message.action === 'processingComplete' ||
+      message.action === 'setPrompt' ||
+      message.action === 'checkAgentStatus' ||
       message.action === 'forceResetPlaywright' ||
-      message.action === 'requestApproval' ||  // Add support for request approval messages
-      message.action === 'checkAgentStatus'  // Add support for agent status check
+      message.action === 'requestApproval' ||
+      message.action === 'quickPrompt' ||
+      message.action === 'openSidePanel'
     )
   );
 }

@@ -150,10 +150,11 @@ export function ProviderSelector({ isProcessing }: ProviderSelectorProps) {
           title="Open Settings"
           disabled={isProcessing}
         >
-          <FontAwesomeIcon icon={faCog} className="text-gray-500 hover:text-gray-700" />
+          <FontAwesomeIcon icon={faCog} className="text-base-content/70 hover:text-base-content" />
         </button>
+        {/* Provider selector dropdown hidden */}
         <select 
-          className="select select-ghost select-xs select-bordered w-auto focus:outline-none focus:ring-0 pl-0"
+          className="select select-ghost select-xs select-bordered w-auto focus:outline-none focus:ring-0 pl-0 hidden"
           value={`${currentProvider}|${currentModel}`}
           onChange={handleChange}
           disabled={isProcessing}

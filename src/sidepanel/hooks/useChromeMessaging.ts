@@ -25,6 +25,7 @@ interface UseChromeMessagingProps {
   onPageConsole?: (tabId: number, consoleInfo: any) => void;
   onPageError?: (tabId: number, error: string) => void;
   onAgentStatusUpdate?: (status: string, lastHeartbeat: number) => void;
+  onSetPrompt?: (prompt: string) => void;
 }
 
 export const useChromeMessaging = ({
@@ -50,12 +51,35 @@ export const useChromeMessaging = ({
   onPageDialog,
   onPageConsole,
   onPageError,
-  onAgentStatusUpdate
+  onAgentStatusUpdate,
+  onSetPrompt
 }: UseChromeMessagingProps) => {
 
   // Listen for updates from the background script
   useEffect(() => {
+    // Check for pending prompts in chrome.storage
+    const checkPendingPrompt = () => {
+      chrome.storage.local.get(['pendingPrompt'], (result) => {
+        if (result.pendingPrompt && onSetPrompt) {
+          const { prompt, timestamp, tabId: promptTabId } = result.pendingPrompt;
+          // Only use the prompt if it's for the current tab and recent (within 10 seconds)
+          if (promptTabId === tabId && Date.now() - timestamp < 10000) {
+            console.log('Found pending prompt in storage:', prompt);
+            onSetPrompt(prompt);
+            // Clear the pending prompt
+            chrome.storage.local.remove(['pendingPrompt']);
+          }
+        }
+      });
+    };
+
+    // Check immediately and then every 200ms for faster response
+    checkPendingPrompt();
+    const interval = setInterval(checkPendingPrompt, 200);
+
     const messageListener = (message: ChromeMessage, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+      console.log('SidePanel received message:', message);
+      
       // Only process messages intended for this tab and window
       // If the message has a tabId, check if it matches this tab's ID
       // If the message has a windowId, check if it matches this window's ID
@@ -107,6 +131,9 @@ export const useChromeMessaging = ({
         onUpdateScreenshot(message.content);
       } else if (message.action === 'processingComplete') {
         onProcessingComplete();
+      } else if (message.action === 'setPrompt' && onSetPrompt && message.prompt) {
+        console.log('Received setPrompt message:', message.prompt);
+        onSetPrompt(message.prompt);
       } else if (message.action === 'requestApproval') {
         // Handle approval requests
         // Check if the fields exist rather than if they're truthy
@@ -199,7 +226,10 @@ export const useChromeMessaging = ({
     };
 
     chrome.runtime.onMessage.addListener(messageListener);
-    return () => chrome.runtime.onMessage.removeListener(messageListener);
+    return () => {
+      chrome.runtime.onMessage.removeListener(messageListener);
+      clearInterval(interval);
+    };
   }, [
     tabId,
     windowId,
@@ -223,7 +253,8 @@ export const useChromeMessaging = ({
     onPageDialog,
     onPageConsole,
     onPageError,
-    onAgentStatusUpdate
+    onAgentStatusUpdate,
+    onSetPrompt
   ]);
 
   const executePrompt = (prompt: string, askMode: boolean = false, imageData?: { type: string; source: { type: string; media_type: string; data: string } }[]) => {

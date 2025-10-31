@@ -1,8 +1,8 @@
-# BrowserBee Test Suite Documentation
+# Beitha Test Suite Documentation
 
 ## Overview
 
-This document describes the test suite structure, configuration, and development practices for the BrowserBee browser automation extension. The test suite provides comprehensive coverage with **548 passing tests** across **18 test suites**.
+This document describes the test suite structure, configuration, and development practices for the Beitha browser automation extension. The test suite provides comprehensive coverage with **548 passing tests** across **18 test suites**.
 
 ## Running Tests
 

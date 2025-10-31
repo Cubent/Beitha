@@ -40,4 +40,5 @@ export interface ChromeMessage {
   // Tab replacement properties
   oldTabId?: number;
   newTabId?: number;
+  prompt?: string;
 }

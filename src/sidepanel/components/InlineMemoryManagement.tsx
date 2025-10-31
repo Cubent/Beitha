@@ -1,8 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { MemoryService } from '../../tracking/memoryService';
 
-export function MemoryManagement() {
-  // Memory management state
+interface InlineMemoryManagementProps {
+  onClose: () => void;
+}
+
+export const InlineMemoryManagement: React.FC<InlineMemoryManagementProps> = ({ onClose }) => {
   const [memoryCount, setMemoryCount] = useState(0);
   const [exportStatus, setExportStatus] = useState('');
   const [importStatus, setImportStatus] = useState('');
@@ -73,13 +76,11 @@ export function MemoryManagement() {
           
           let importedCount = 0;
           for (const memory of memories) {
-            // Validate memory structure
             if (!memory.domain || !memory.taskDescription || !memory.toolSequence) {
               console.warn('Skipping invalid memory:', memory);
               continue;
             }
             
-            // Ensure createdAt exists
             if (!memory.createdAt) {
               memory.createdAt = Date.now();
             }
@@ -88,13 +89,11 @@ export function MemoryManagement() {
             importedCount++;
           }
           
-          // Refresh memory count
           await loadMemoryCount();
           
           setImportStatus(`Successfully imported ${importedCount} memories!`);
           setTimeout(() => setImportStatus(''), 3000);
           
-          // Reset file input
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
           }
@@ -116,29 +115,43 @@ export function MemoryManagement() {
     }
   };
 
-  // Load memory count when component mounts
   useEffect(() => {
     loadMemoryCount();
   }, []);
 
   return (
-    <div className="card bg-base-100 shadow-md">
-      <div className="card-body">
-        <h2 className="card-title text-xl">Memory Management</h2>
-        <p className="mb-4">
-          Beitha stores memories of successful interactions with websites to help improve future interactions.
-          You can export these memories for backup or transfer to another device, and import them back later.
+    <div className="flex flex-col h-screen p-4 bg-white" style={{ border: 'none', outline: 'none' }}>
+      {/* Thin header with close button */}
+      <header className="mb-1 py-1 border-b border-gray-200">
+        <div className="flex justify-between items-center">
+          <h2 className="text-sm font-semibold text-gray-900">Memory Management</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-lg font-bold"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+      </header>
+      
+      <div className="flex-1 overflow-auto p-3 bg-white scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100" style={{
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#d1d5db #f3f4f6'
+      }}>
+        <p className="text-gray-700 mb-4 text-sm">
+          Beitha stores memories of successful interactions with websites to help improve future interactions. You can export these memories for backup or transfer to another device, and import them back later.
         </p>
         
         <div className="flex items-center mb-4">
-          <span className="font-medium mr-2">Current memories:</span>
-          <span className="badge badge-primary">{memoryCount}</span>
+          <span className="font-medium mr-2 text-gray-900 text-sm">Current memories:</span>
+          <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-sm">{memoryCount}</span>
         </div>
         
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-3 mb-4">
           <button 
             onClick={handleExportMemories} 
-            className="btn btn-primary"
+            className="px-3 py-1.5 bg-gray-900 text-white rounded hover:bg-gray-800 transition-colors text-sm font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
             disabled={memoryCount === 0}
           >
             Export Memories
@@ -146,12 +159,11 @@ export function MemoryManagement() {
           
           <button 
             onClick={triggerFileInput} 
-            className="btn btn-secondary"
+            className="px-3 py-1.5 bg-gray-200 text-gray-900 rounded hover:bg-gray-300 transition-colors text-sm font-medium"
           >
             Import Memories
           </button>
           
-          {/* Hidden file input for import */}
           <input
             type="file"
             ref={fileInputRef}
@@ -162,17 +174,22 @@ export function MemoryManagement() {
         </div>
         
         {exportStatus && (
-          <div className={`alert ${exportStatus.includes('Error') ? 'alert-error' : 'alert-success'} mt-4`}>
+          <div className={`px-3 py-2 rounded text-sm mb-2 ${
+            exportStatus.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+          }`}>
             {exportStatus}
           </div>
         )}
         
         {importStatus && (
-          <div className={`alert ${importStatus.includes('Error') ? 'alert-error' : 'alert-success'} mt-4`}>
+          <div className={`px-3 py-2 rounded text-sm ${
+            importStatus.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+          }`}>
             {importStatus}
           </div>
         )}
       </div>
     </div>
   );
-}
+};
+

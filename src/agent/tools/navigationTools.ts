@@ -2,6 +2,8 @@ import { DynamicTool } from "langchain/tools";
 import type { Page } from "playwright-crx";
 import { ToolFactory } from "./types";
 import { withActivePage, getCurrentTabId } from "./utils";
+import { normalizeDomain } from '../../tracking/domainUtils';
+import { MemoryService } from '../../tracking/memoryService';
 
 export const browserNavigate: ToolFactory = (page: Page) =>
   new DynamicTool({
@@ -39,7 +41,31 @@ export const browserNavigate: ToolFactory = (page: Page) =>
             console.error("Error updating UI after navigation:", titleError);
           }
           
-          return `Successfully navigated to ${url}`;
+          // Automatically look up memories for this domain
+          let memoryInfo = '';
+          try {
+            const domain = normalizeDomain(url);
+            if (domain) {
+              const memoryService = MemoryService.getInstance();
+              const memories = await memoryService.getMemoriesByDomain(domain);
+              
+              if (memories.length > 0) {
+                // Sort memories by creation date (newest first)
+                memories.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                
+                const memoryDescriptions = memories.slice(0, 5).map(m => 
+                  `• ${m.taskDescription} (tools: ${m.toolSequence.join(', ')})`
+                ).join('\n');
+                
+                memoryInfo = `\n\nFound ${memories.length} saved memory(ies) for this domain:\n${memoryDescriptions}${memories.length > 5 ? `\n... and ${memories.length - 5} more` : ''}`;
+              }
+            }
+          } catch (memoryError) {
+            // Log but don't fail the tool if memory lookup fails
+            console.warn(`Error looking up memories after navigation: ${memoryError instanceof Error ? memoryError.message : String(memoryError)}`);
+          }
+          
+          return `Successfully navigated to ${url}${memoryInfo}`;
         });
       } catch (error) {
         return `Error navigating to ${url}: ${

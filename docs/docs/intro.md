@@ -2,15 +2,15 @@
 sidebar_position: 1
 ---
 
-# Introduction to BrowserBee
+# Introduction to Beitha
 
-Welcome to the BrowserBee documentation! This guide will help you understand what BrowserBee is, how to install it, and how to use it effectively.
+Welcome to the Beitha documentation! This guide will help you understand what Beitha is, how to install it, and how to use it effectively.
 
-## What is BrowserBee?
+## What is Beitha?
 
-BrowserBee is a privacy-first open source Chrome extension that lets you control your browser using natural language. It combines the power of an LLM for instruction parsing and Playwright for robust browser automation.
+Beitha is a privacy-first open source Chrome extension that lets you control your browser using natural language. It combines the power of an LLM for instruction parsing and Playwright for robust browser automation.
 
-Since BrowserBee runs entirely within your browser (with the exception of the LLM), it can interact with logged-in websites, like your social media accounts or email, without compromising security or requiring backend infrastructure. This makes it more convenient for personal use than other "browser use" type products out there.
+Since Beitha runs entirely within your browser (with the exception of the LLM), it can interact with logged-in websites, like your social media accounts or email, without compromising security or requiring backend infrastructure. This makes it more convenient for personal use than other "browser use" type products out there.
 
 ## Key Features
 
@@ -56,12 +56,12 @@ Since BrowserBee runs entirely within your browser (with the exception of the LL
 
 ## Basic Usage
 
-1. Click the BrowserBee icon in your Chrome toolbar to open the side panel
+1. Click the Beitha icon in your Chrome toolbar to open the side panel
 2. Type your instruction (e.g., *"Go to Google, search for Cicero, and click the first result"*)
-3. Hit Enter and watch BrowserBee go to work 🐝
+3. Hit Enter and watch Beitha go to work 🐝
 
 ## Next Steps
 
-- Check out the [Architecture](./architecture.md) to understand how BrowserBee works
-- Read the [User Guide](./user-guide.md) to learn how to use BrowserBee effectively
+- Check out the [Architecture](./architecture.md) to understand how Beitha works
+- Read the [User Guide](./user-guide.md) to learn how to use Beitha effectively
 - Read the [Contributing Guide](./contributing.md) if you want to contribute to the project

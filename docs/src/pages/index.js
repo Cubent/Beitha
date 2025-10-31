@@ -30,7 +30,7 @@ export default function Home() {
   return (
     <Layout
       title={`${siteConfig.title}`}
-      description="BrowserBee - Control your browser with natural language. A privacy-first Chrome extension for browser automation.">
+      description="Beitha - Control your browser with natural language. A privacy-first Chrome extension for browser automation.">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

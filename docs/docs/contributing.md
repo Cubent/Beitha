@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Contributing Guide
 
-Thank you for your interest in contributing to BrowserBee! This guide will help you get started with contributing to the project.
+Thank you for your interest in contributing to Beitha! This guide will help you get started with contributing to the project.
 
 ## Code of Conduct
 

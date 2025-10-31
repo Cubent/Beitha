@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # Deployment Guide
 
-This guide will walk you through the process of deploying the BrowserBee documentation to GitHub Pages.
+This guide will walk you through the process of deploying the Beitha documentation to GitHub Pages.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ Before you begin, make sure you have:
 1. A GitHub account
 2. Git installed on your local machine
 3. Node.js and npm installed
-4. Access to the BrowserBee repository
+4. Access to the Beitha repository
 
 ## Setting Up GitHub Pages
 

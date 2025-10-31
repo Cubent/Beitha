@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to BrowserBee will be documented in this file.
+All notable changes to Beitha will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -115,7 +115,7 @@ Initial beta release with core browser automation functionality.
 
 ### 🚀 What's New in v0.2.0
 
-This release represents a major evolution of BrowserBee with significant improvements across AI capabilities, developer experience, and user interface design.
+This release represents a major evolution of Beitha with significant improvements across AI capabilities, developer experience, and user interface design.
 
 **Key Highlights:**
 - **Next-Generation AI Models**: Support for the latest Claude 4.5 and GPT-5 series models with enhanced reasoning capabilities
@@ -143,4 +143,4 @@ This release represents a major evolution of BrowserBee with significant improve
 - **3 new provider integrations** (OpenAI-compatible, enhanced Ollama)
 - **Complete UI redesign** with modular architecture
 
-This release establishes BrowserBee as a mature, well-tested platform for browser automation with cutting-edge AI capabilities.
+This release establishes Beitha as a mature, well-tested platform for browser automation with cutting-edge AI capabilities.

@@ -7,7 +7,7 @@ import { logWithTimestamp } from './utils';
  * Initialize the extension
  */
 function initializeExtension(): void {
-  logWithTimestamp('BrowserBee 🐝 extension initialized');
+  logWithTimestamp('Beitha extension initialized');
 
   // Set up message listeners
   setupMessageListeners();
@@ -20,6 +20,9 @@ function initializeExtension(): void {
 
   // Set up command listeners
   setupCommandListeners();
+
+  // Set up context menu
+  setupContextMenu();
 }
 
 /**
@@ -55,7 +58,7 @@ function setupEventListeners(): void {
 
   // Open options page when the extension is first installed
   chrome.runtime.onInstalled.addListener((details) => {
-    logWithTimestamp('BrowserBee 🐝 extension installed');
+    logWithTimestamp('Beitha extension installed');
 
     if (details.reason === 'install') {
       chrome.runtime.openOptionsPage();
@@ -114,7 +117,7 @@ function setupEventListeners(): void {
       // Delete the memory database on uninstall/disable
       try {
         logWithTimestamp('Deleting memory database');
-        const request = indexedDB.deleteDatabase('browserbee-memories');
+        const request = indexedDB.deleteDatabase('beitha-memories');
 
         request.onsuccess = () => {
           logWithTimestamp('Memory database deleted successfully');
@@ -141,7 +144,7 @@ function setupEventListeners(): void {
       // Delete the memory database before update
       try {
         logWithTimestamp('Deleting memory database before update');
-        const request = indexedDB.deleteDatabase('browserbee-memories');
+        const request = indexedDB.deleteDatabase('beitha-memories');
 
         request.onsuccess = () => {
           logWithTimestamp('Memory database deleted successfully before update');
@@ -232,6 +235,173 @@ function setupCommandListeners(): void {
   logWithTimestamp('Command listeners set up');
 }
 
+/**
+ * Set up context menu for text selection
+ */
+function setupContextMenu(): void {
+  logWithTimestamp('Setting up context menu');
+
+  // Create the main AI Actions menu
+  chrome.contextMenus.create({
+    id: 'beitha-ai-actions',
+    title: 'AI Actions',
+    contexts: ['selection']
+  });
+
+  // Create submenu items
+  const aiActions = [
+    { id: 'summarize', title: 'Summarize' },
+    { id: 'translate', title: 'Translate' },
+    { id: 'explain', title: 'Explain this' },
+    { id: 'rewrite', title: 'Rewrite' },
+    { id: 'expand', title: 'Expand' },
+    { id: 'grammar', title: 'Grammar check' },
+    { id: 'answer', title: 'Answer this question' },
+    { id: 'explain-code', title: 'Explain Code' }
+  ];
+
+  aiActions.forEach(action => {
+    chrome.contextMenus.create({
+      id: action.id,
+      parentId: 'beitha-ai-actions',
+      title: action.title,
+      contexts: ['selection']
+    });
+  });
+
+  // Listen for context menu clicks
+  chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    if (info.menuItemId && info.selectionText && tab?.id) {
+      logWithTimestamp(`Context menu action: ${info.menuItemId} for text: "${info.selectionText.substring(0, 50)}..."`);
+      
+      // Send the selected text to the AI with the specific action
+      await handleContextMenuAction(info.menuItemId as string, info.selectionText, tab.id);
+    }
+  });
+
+  logWithTimestamp('Context menu set up successfully');
+}
+
+/**
+ * Handle context menu actions
+ */
+async function handleContextMenuAction(action: string, selectedText: string, tabId: number): Promise<void> {
+  try {
+    // Create a prompt based on the action
+    const actionPrompts: Record<string, string> = {
+      'summarize': `Please summarize the following text in a clear and concise way:\n\n"${selectedText}"`,
+      'translate': `Please translate the following text to English (or specify the target language if you can detect it):\n\n"${selectedText}"`,
+      'explain': `Please explain the following text in simple terms:\n\n"${selectedText}"`,
+      'rewrite': `Please rewrite the following text to make it clearer and more professional:\n\n"${selectedText}"`,
+      'expand': `Please expand on the following text with more detail and context:\n\n"${selectedText}"`,
+      'grammar': `Please check the grammar and fix any errors in the following text:\n\n"${selectedText}"`,
+      'answer': `Please answer the following question or provide information about this topic:\n\n"${selectedText}"`,
+      'explain-code': `Please explain the following code:\n\n"${selectedText}"`
+    };
+
+    const prompt = actionPrompts[action] || `Please help with the following text:\n\n"${selectedText}"`;
+    
+    // Open the side panel first
+    try {
+      await chrome.sidePanel.open({ tabId });
+    } catch (error) {
+      logWithTimestamp(`Error opening side panel: ${error}`, 'warn');
+    }
+
+    // Store the prompt in chrome.storage and let the side panel poll for it
+    // This is more reliable than runtime messages when the side panel is just opening
+    chrome.storage.local.set({
+      'pendingPrompt': {
+        prompt: prompt,
+        timestamp: Date.now(),
+        tabId: tabId
+      }
+    }, () => {
+      logWithTimestamp('Stored prompt in chrome.storage.local');
+    });
+
+    // Also try sending via runtime message after a delay to give the side panel time to load
+    setTimeout(() => {
+      logWithTimestamp(`Sending setPrompt message after delay: "${prompt.substring(0, 100)}..."`);
+      chrome.runtime.sendMessage({
+        action: 'setPrompt',
+        prompt: prompt,
+        tabId: tabId
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          logWithTimestamp(`Error sending setPrompt message: ${chrome.runtime.lastError.message}`, 'error');
+        } else {
+          logWithTimestamp(`setPrompt message sent successfully, response: ${JSON.stringify(response)}`);
+        }
+      });
+    }, 1000); // Wait 1 second for the side panel to fully load
+
+    logWithTimestamp(`Context menu action "${action}" executed successfully`);
+  } catch (error) {
+    logWithTimestamp(`Error handling context menu action: ${error}`, 'error');
+  }
+}
+
+/**
+ * Handle quick prompt from content script
+ */
+async function handleQuickPrompt(text: string, tabId: number): Promise<void> {
+  try {
+    logWithTimestamp(`Quick prompt triggered with text: "${text.substring(0, 100)}..."`);
+
+    // Create a general prompt for the selected text
+    const prompt = `Please help with the following text:\n\n"${text}"`;
+    
+    // Open the side panel first
+    try {
+      await chrome.sidePanel.open({ tabId });
+    } catch (error) {
+      logWithTimestamp(`Error opening side panel: ${error}`, 'warn');
+    }
+
+    // Immediately show the user's message in the UI for responsiveness
+    import('./utils').then(({ sendUIMessage }) => {
+      sendUIMessage('updateOutput', {
+        type: 'user',
+        content: prompt
+      }, tabId);
+    }).catch(() => {/* noop */});
+
+    // Store the prompt in chrome.storage and let the side panel poll for it
+    chrome.storage.local.set({
+      'pendingPrompt': {
+        prompt: prompt,
+        timestamp: Date.now(),
+        tabId: tabId
+      }
+    }, () => {
+      logWithTimestamp('Stored quick prompt in chrome.storage.local');
+    });
+
+    // Also try sending via runtime message after a short delay
+    setTimeout(() => {
+      logWithTimestamp(`Sending quick prompt message after delay: "${prompt.substring(0, 100)}..."`);
+      chrome.runtime.sendMessage({
+        action: 'setPrompt',
+        prompt: prompt,
+        tabId: tabId
+      }, () => {
+        // After prompt is set, execute in Ask mode for immediate action
+        chrome.runtime.sendMessage({
+          action: 'executePrompt',
+          prompt: prompt,
+          tabId: tabId,
+          askMode: true
+        });
+      });
+    }, 800);
+
+    logWithTimestamp(`Quick prompt executed successfully`);
+  } catch (error) {
+    logWithTimestamp(`Error handling quick prompt: ${error}`, 'error');
+  }
+}
+
 // Initialize the extension
 initializeExtension();
 
@@ -239,5 +409,7 @@ initializeExtension();
 export default {
   initializeExtension,
   setupEventListeners,
-  setupCommandListeners
+  setupCommandListeners,
+  setupContextMenu,
+  handleQuickPrompt
 };

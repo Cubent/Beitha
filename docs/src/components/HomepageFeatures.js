@@ -28,7 +28,7 @@ const FeatureList = [
     Svg: require('../../static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>
-        BrowserBee runs entirely within your browser, allowing it to interact with your
+        Beitha runs entirely within your browser, allowing it to interact with your
         logged-in websites without compromising security.
       </>
     ),

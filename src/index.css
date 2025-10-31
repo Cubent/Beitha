@@ -28,6 +28,33 @@
   scrollbar-color: #cbd5e1 #f1f5f9;
 }
 
+/* Chat input textarea scrollbar - thin and outside */
+.ai-input-textarea::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ai-input-textarea::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+.ai-input-textarea::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 2px;
+  border: none;
+}
+
+.ai-input-textarea::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Firefox scrollbar for chat input - thin and outside */
+.ai-input-textarea {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  padding-right: 8px;
+}
+
 @theme inline {
   --animate-fade-scale: fade-scale 0.2s ease-out;
 

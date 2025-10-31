@@ -44,10 +44,6 @@ import {
   browserScreenshotTab
 } from "./tabContextTools";
 
-
-
-
-
 import { 
   browserTabList, 
   browserTabNew, 
@@ -55,6 +51,7 @@ import {
   browserTabClose 
 } from "./tabTools";
 import { ToolFactory } from "./types";
+import { browserDismissPopups } from "./popupTools";
 
 // Export all tools
 export {
@@ -102,7 +99,10 @@ export {
   lookupMemories,
   getAllMemories,
   deleteMemory,
-  clearAllMemories
+  clearAllMemories,
+
+  // Popup tools
+  browserDismissPopups
 };
 
 // Function to get all tools as an array
@@ -152,7 +152,10 @@ export function getAllTools(page: Page) {
     lookupMemories(page),
     getAllMemories(page),
     deleteMemory(page),
-    clearAllMemories(page)
+    clearAllMemories(page),
+
+    // Popup tools
+    browserDismissPopups(page)
   ];
   
   return tools;

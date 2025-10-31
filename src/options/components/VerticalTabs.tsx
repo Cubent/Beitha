@@ -147,7 +147,7 @@ export function VerticalTabs(props: VerticalTabsProps) {
       {/* Left Sidebar - Vertical Tabs */}
       <div className="w-64 bg-base-100 shadow-lg">
         <div className="p-4">
-          <h1 className="text-2xl font-bold text-primary mb-6">BrowserBee 🐝</h1>
+          <h1 className="text-2xl font-bold text-primary mb-6">Beitha 🐝</h1>
           <div className="tabs tabs-vertical w-full">
             {tabs.map((tab) => (
               <button

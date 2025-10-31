@@ -11,7 +11,7 @@ export function GeneralTab() {
         <div className="card-body">
           <h2 className="card-title text-xl">🚀 Getting Started</h2>
           <p className="mb-4">
-            Follow these simple steps to start using BrowserBee:
+            Follow these simple steps to start using Beitha:
           </p>
           
           {/* Demo Video */}
@@ -21,7 +21,7 @@ export function GeneralTab() {
                 width="100%"
                 height="100%"
                 src="https://www.youtube.com/embed/SFBelCiZq_4"
-                title="BrowserBee Demo"
+                title="Beitha Demo"
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
@@ -49,7 +49,7 @@ export function GeneralTab() {
             
             <div className="step step-primary">
               <div className="step-content text-left">
-                <h3 className="font-semibold text-lg mb-2">2. Configure BrowserBee</h3>
+                <h3 className="font-semibold text-lg mb-2">2. Configure Beitha</h3>
                 <p className="text-sm mb-2">
                   Go to the <strong>LLM Configuration</strong> tab and:
                 </p>
@@ -69,9 +69,9 @@ export function GeneralTab() {
                 </p>
                 <ul className="text-sm list-disc list-inside space-y-1 ml-4">
                   <li>Open a new tab and go to <code className="bg-base-200 px-1 rounded">google.com</code></li>
-                  <li>Click the BrowserBee icon or press <kbd className="kbd kbd-xs">Alt</kbd>+<kbd className="kbd kbd-xs">Shift</kbd>+<kbd className="kbd kbd-xs">B</kbd></li>
+                  <li>Click the Beitha icon or press <kbd className="kbd kbd-xs">Alt</kbd>+<kbd className="kbd kbd-xs">Shift</kbd>+<kbd className="kbd kbd-xs">B</kbd></li>
                   <li>Type: <em>"Search for the weather in Paris"</em></li>
-                  <li>Press Enter and watch BrowserBee work! 🐝</li>
+                  <li>Press Enter and watch Beitha work! 🐝</li>
                 </ul>
               </div>
             </div>
@@ -85,10 +85,10 @@ export function GeneralTab() {
             <div>
               <h3 className="font-bold">💡 Pro Tips</h3>
               <ul className="text-sm mt-2 space-y-1">
-                <li>• <strong>Keep BrowserBee attached:</strong> Leave it connected to a tab throughout your session for best performance</li>
+                <li>• <strong>Keep Beitha attached:</strong> Leave it connected to a tab throughout your session for best performance</li>
                 <li>• <strong>Reattach if needed:</strong> If you close the attached tab, use the <strong>reattach</strong> button to reconnect</li>
-                <li>• <strong>One per window:</strong> You can run one BrowserBee instance per Chrome window</li>
-                <li>• <strong>Tab limitations:</strong> BrowserBee can't attach to new tabs or chrome:// pages</li>
+                <li>• <strong>One per window:</strong> You can run one Beitha instance per Chrome window</li>
+                <li>• <strong>Tab limitations:</strong> Beitha can't attach to new tabs or chrome:// pages</li>
               </ul>
             </div>
           </div>
@@ -111,7 +111,7 @@ export function GeneralTab() {
             
             <div className="text-center">
               <p className="text-sm text-base-content/70">
-                Get help, share tips, and connect with other BrowserBee users
+                Get help, share tips, and connect with other Beitha users
               </p>
             </div>
           </div>

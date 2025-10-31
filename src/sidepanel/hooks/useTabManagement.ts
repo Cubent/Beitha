@@ -129,7 +129,7 @@ export const useTabManagement = (mode: 'ask' | 'do' = 'do') => {
 
         // Update the tab ID and title
         setTabId(message.newTabId);
-        setTabTitle(message.title || "New BrowserBee Tab");
+        setTabTitle(message.title || "New Beitha Tab");
 
         sendResponse({ received: true });
         return true;

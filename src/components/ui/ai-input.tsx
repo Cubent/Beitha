@@ -1,6 +1,6 @@
 "use client";
 
-import { CornerRightUp, Globe, Square, Plug, Plus, FileText, Image, X } from "lucide-react";
+import { CornerRightUp, MousePointer, Square, Plug, Plus, FileText, Image, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
@@ -175,7 +175,7 @@ export function AIInput({
   }, [inputValue]);
 
   return (
-    <div className={cn("w-full py-4", className)}>
+    <div className={cn("w-full py-3", className)}>
       <div 
         className={cn(
           "relative max-w-xl w-full mx-auto bg-black/5 dark:bg-white/5 rounded-3xl p-2 transition-colors",
@@ -189,13 +189,14 @@ export function AIInput({
         <textarea
           id={id}
           placeholder={placeholder}
-          className="w-full bg-transparent text-black dark:text-white border-none outline-none resize-none pl-2 pr-2"
+          className="w-full bg-transparent text-black dark:text-white border-none outline-none resize-none pl-2 pr-2 ai-input-textarea"
           style={{
-            height: '22px',
-            paddingTop: '11px',
-            paddingBottom: '11px',
+            height: '18px',
+            paddingTop: '9px',
+            paddingBottom: '9px',
             lineHeight: '1.2',
-            fontSize: '16px'
+            fontSize: '16px',
+            overflowY: 'auto'
           }}
           ref={textareaRef}
           value={inputValue}
@@ -308,7 +309,7 @@ export function AIInput({
                 isGlobeActive ? "bg-blue-500/10 text-blue-500" : "bg-black/8 dark:bg-white/8 text-black/70 dark:text-white/70"
               )}
             >
-              <Globe className="w-4 h-4" />
+              <MousePointer className="w-4 h-4" />
               <span className="text-sm">Agent</span>
             </button>
             

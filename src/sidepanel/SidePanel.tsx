@@ -12,6 +12,7 @@ import { TabStatusBar } from './components/TabStatusBar';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
 import { extractTextFromPDF, formatPDFResult, PDFProcessingResult } from '../utils/pdfProcessor';
 import { WelcomeScreen } from './components/WelcomeScreen';
+import { InlineMemoryManagement } from './components/InlineMemoryManagement';
 import { useChromeMessaging } from './hooks/useChromeMessaging';
 import { useMessageManagement } from './hooks/useMessageManagement';
 import { useTabManagement } from './hooks/useTabManagement';
@@ -42,6 +43,9 @@ export function SidePanel() {
   
   // State for tab favicon
   const [tabFavicon, setTabFavicon] = useState<string>('');
+  
+  // State for showing memory management inline
+  const [showMemoryManagement, setShowMemoryManagement] = useState<boolean>(false);
 
   // Load saved mode from storage when component mounts
   useEffect(() => {
@@ -187,6 +191,9 @@ export function SidePanel() {
     },
     onStreamingComplete: () => {
       completeStreaming();
+    },
+    onSetPrompt: (prompt: string) => {
+      setInputValue(prompt);
     },
     onUpdateLlmOutput: (content) => {
       addMessage({ type: 'llm', content, isComplete: true });
@@ -629,36 +636,31 @@ export function SidePanel() {
     chrome.runtime.openOptionsPage();
   };
 
+  // Show memory management inline if requested
+  if (showMemoryManagement) {
+    return (
+      <div className="flex flex-col h-screen bg-white" style={{ border: 'none', outline: 'none' }}>
+        <InlineMemoryManagement onClose={() => setShowMemoryManagement(false)} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen p-4 bg-white" style={{ border: 'none', outline: 'none' }}>
-      <header className="mb-4">
+      {/* Thin header with beta preview and settings */}
+      <header className="mb-1 py-1 border-b border-gray-200">
         <div className="flex justify-between items-center">
-          <TabStatusBar
-            tabId={tabId}
-            tabTitle={tabTitle}
-            tabStatus={tabStatus}
-          />
-          {/* Buttons hidden per user request */}
-          {/* <div className="flex items-center gap-2">
-            <div className="tooltip tooltip-bottom" data-tip="Reflect and learn from this session">
-              <button 
-                onClick={handleReflectAndLearn}
-                className="btn btn-xs btn-outline btn-primary"
-                disabled={isProcessing}
-              >
-                <FontAwesomeIcon icon={faBrain} />
-              </button>
-            </div>
-            <div className="tooltip tooltip-bottom" data-tip="Clear conversation history and LLM context">
-              <button 
-                onClick={handleClearHistory}
-                className="btn btn-xs btn-outline"
-                disabled={isProcessing}
-              >
-                <FontAwesomeIcon icon={faTrash} />
-              </button>
-            </div>
-          </div> */}
+          <span className="text-xs text-gray-500 font-medium">BETA PREVIEW</span>
+          <button
+            onClick={() => setShowMemoryManagement(true)}
+            className="p-1 rounded bg-gray-100 hover:bg-gray-200 transition-colors"
+            aria-label="Open Memory Management"
+            title="Memory Management"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-3.5 h-3.5 text-gray-600 fill-current">
+              <path d="M495.9 166.6c3.2 8.7 .5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6c-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2c-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.3-28 18.9-43.5 25.4l-12.5 57.1c-2 9.1-9 16.3-18.2 17.8c-13.8 2.3-28 3.5-42.5 3.5s-28.7-1.2-42.5-3.5c-9.2-1.5-16.2-8.7-18.2-17.8l-12.5-57.1c-15.5-6.5-30.1-15.1-43.5-25.4L83.1 425.9c-8.8 2.8-18.6 .3-24.5-6.8c-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3c-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6c4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2c5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.3 28-18.9 43.5-25.4l12.5-57.1c2-9.1 9-16.3 18.2-17.8C205.3 1.2 219.5 0 234 0s28.7 1.2 42.5 3.5c9.2 1.5 16.2 8.7 18.2 17.8l12.5 57.1c15.5 6.5 30.1 15.1 43.5 25.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8c8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/>
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -668,7 +670,9 @@ export function SidePanel() {
             <div className="bg-white flex-1 flex flex-col overflow-hidden">
               <div
                 ref={outputRef}
-                className="p-3 overflow-auto bg-white flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+                className={`p-3 overflow-auto bg-white flex-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 ${
+                  messages.length === 0 && !isStreaming ? 'flex flex-col' : ''
+                }`}
                 style={{
                   scrollbarWidth: 'thin',
                   scrollbarColor: '#d1d5db #f3f4f6'
@@ -729,7 +733,7 @@ export function SidePanel() {
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold mb-2">No LLM provider configured</h2>
             <p className="text-gray-600 mb-4">
-              You need to configure an LLM provider before you can use BrowserBee.
+              You need to configure an LLM provider before you can use Beitha.
             </p>
             <button
               onClick={navigateToOptions}

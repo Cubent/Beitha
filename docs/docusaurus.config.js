@@ -4,7 +4,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 // With JSDoc @type annotations, IDEs can provide config autocompletion
 /** @type {import('@docusaurus/types').DocusaurusConfig} */
 (module.exports = {
-  title: 'BrowserBee Docs',
+  title: 'Beitha Docs',
   tagline: 'Control your browser with natural language',
   url: 'https://parsaghaffari.github.io',
   baseUrl: '/browserbee/',
@@ -41,9 +41,9 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'BrowserBee Docs',
+        title: 'Beitha Docs',
         logo: {
-          alt: 'BrowserBee Logo',
+          alt: 'Beitha Logo',
           src: 'img/logo.svg',
         },
         items: [
@@ -123,7 +123,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} BrowserBee Contributors. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} Beitha Contributors. Built with Docusaurus.`,
       },
       prism: {
         theme: lightCodeTheme,

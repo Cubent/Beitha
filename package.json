@@ -1,5 +1,5 @@
 {
-  "name": "browserbee",
+  "name": "beitha",
   "description": "Control your browser with natural language",
   "version": "0.2.0",
   "type": "module",
@@ -10,11 +10,11 @@
     "claude",
     "playwright"
   ],
-  "author": "BrowserBee Contributors",
+  "author": "Beitha Contributors",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/parsaghaffari/browserbee.git"
+    "url": "https://github.com/Cubent/Beitha.git"
   },
   "scripts": {
     "build": "tsc && vite build && node scripts/copy-static.js",

@@ -1,6 +1,6 @@
-# Contributing to BrowserBee
+# Contributing to Beitha
 
-Thank you for your interest in contributing to BrowserBee! This document provides guidelines and instructions for contributing to this project.
+Thank you for your interest in contributing to Beitha! This document provides guidelines and instructions for contributing to this project.
 
 ## Code of Conduct
 
@@ -53,7 +53,7 @@ The project is organized into several modules:
 
 ## Testing & Quality Assurance
 
-BrowserBee has a comprehensive testing infrastructure with **548 tests** across **18 test suites** to ensure code quality and reliability.
+Beitha has a comprehensive testing infrastructure with **548 tests** across **18 test suites** to ensure code quality and reliability.
 
 ### Running Tests
 
@@ -143,7 +143,7 @@ npm test && npm run lint && npx tsc --noEmit
 
 ## CI/CD Pipeline
 
-BrowserBee uses **GitHub Actions** for automated testing and quality assurance.
+Beitha uses **GitHub Actions** for automated testing and quality assurance.
 
 ### Automated Checks
 

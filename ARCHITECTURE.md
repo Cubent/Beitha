@@ -1,10 +1,10 @@
-# BrowserBee Architecture
+# Beitha Architecture
 
-This document provides a detailed overview of BrowserBee's architecture, component structure, and code organization.
+This document provides a detailed overview of Beitha's architecture, component structure, and code organization.
 
 ## Overview
 
-BrowserBee uses a modular agent architecture with four key modules:
+Beitha uses a modular agent architecture with four key modules:
 
 - **Agent Module** – Processes user instructions and maps them to browser actions
 - **Background Module** – Manages tab control, messaging, and task streaming
@@ -107,7 +107,7 @@ The UI Module provides the user interface for interacting with the extension.
 
 #### Side Panel
 
-The Side Panel is the main interface for interacting with BrowserBee. It has been refactored into a modular component structure:
+The Side Panel is the main interface for interacting with Beitha. It has been refactored into a modular component structure:
 
 - **sidepanel/SidePanel.tsx**: Main component that orchestrates the UI
   - Composes all UI components

@@ -13,7 +13,7 @@ export interface AgentMemory {
 export class MemoryService {
   private static instance: MemoryService;
   private db: IDBDatabase | null = null;
-  private readonly DB_NAME = 'browserbee-memories';
+  private readonly DB_NAME = 'beitha-memories';
   private readonly STORE_NAME = 'memories';
   private DB_VERSION = 1; // Not readonly so we can increment it if needed
   private isInitialized = false;

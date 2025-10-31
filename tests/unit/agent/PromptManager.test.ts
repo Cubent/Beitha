@@ -55,7 +55,7 @@ describe('PromptManager', () => {
       const emptyPromptManager = new PromptManager([]);
       const systemPrompt = emptyPromptManager.getSystemPrompt();
       
-      expect(systemPrompt).toContain('You are a browser-automation assistant called **BrowserBee 🐝**');
+      expect(systemPrompt).toContain('You are a browser-automation assistant called **Beitha 🐝**');
       // The prompt contains "browser_click" in the instructions, not in tool descriptions
       expect(systemPrompt).toContain('browser_click');
     });
@@ -120,7 +120,7 @@ describe('PromptManager', () => {
     it('should generate system prompt with tool descriptions', () => {
       const systemPrompt = promptManager.getSystemPrompt();
 
-      expect(systemPrompt).toContain('You are a browser-automation assistant called **BrowserBee 🐝**');
+      expect(systemPrompt).toContain('You are a browser-automation assistant called **Beitha 🐝**');
       expect(systemPrompt).toContain('browser_click: Click on an element using CSS selector');
       expect(systemPrompt).toContain('browser_type: Type text into an input field');
       expect(systemPrompt).toContain('browser_navigate: Navigate to a URL');
@@ -301,7 +301,7 @@ describe('PromptManager', () => {
       const systemPrompt = promptManager.getSystemPrompt();
 
       // Verify all components are present
-      expect(systemPrompt).toContain('BrowserBee 🐝');
+      expect(systemPrompt).toContain('Beitha 🐝');
       expect(systemPrompt).toContain('CURRENT PAGE CONTEXT');
       expect(systemPrompt).toContain('https://google.com');
       expect(systemPrompt).toContain('search_input: Input search query');
@@ -444,7 +444,7 @@ describe('PromptManager', () => {
 
       // Should still work correctly
       const systemPrompt = promptManager.getSystemPrompt();
-      expect(systemPrompt).toContain('BrowserBee 🐝');
+      expect(systemPrompt).toContain('Beitha 🐝');
       expect(systemPrompt).toContain('tool_99');
       expect(systemPrompt).toContain('https://site99.com');
     });
